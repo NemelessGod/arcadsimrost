@@ -141,7 +141,7 @@ async function check(name, run) { const reason = await run(); if (typeof reason 
       const saved = await page.evaluate(() => { NE.Save.data.selectedForm = 2; NE.Save.setting('volume', .37); NE.Save.persist(); return { forms: NE.Save.data.forms, records: NE.Save.data.records, achievements: NE.Save.data.achievements }; });
       await page.reload(); await page.waitForFunction(() => !!window.NE?.renderer);
       assert.deepEqual(await page.evaluate(() => ({ forms: NE.Save.data.forms, records: NE.Save.data.records, achievements: NE.Save.data.achievements })), saved); assert.equal(await page.evaluate(() => NE.Save.data.selectedForm), 2); assert.equal(await page.evaluate(() => NE.Save.data.settings.volume), .37);
-      await page.click('[data-action="records"]'); await page.click('[data-tab="achievements"]'); assert.equal(await page.locator('.achievement').count(), 10); await page.click('#dialog-close');
+      await page.click('[data-action="records"]'); await page.click('[data-tab="achievements"]'); assert.equal(await page.locator('.achievement').count(), 13); await page.click('#dialog-close');
     });
     await check('Corrupt, unsupported and malformed save data recover safely', async () => {
       assert.equal(await page.evaluate(() => { const result = NE.Save.validate({ version: 2, forms: [0, -1, 999, '2'], selectedForm: 4, settings: { volume: 100, quality: 'bad', sound: 'no' }, achievements: ['first', 'forged'], records: { survival: [{ score: -1, time: 0, stage: 0 }, { score: 12, time: 5, stage: 0 }] } }); return result.forms.length === 1 && result.selectedForm === 0 && result.settings.volume === 1 && result.settings.quality === 'high' && result.achievements.length === 1 && result.records.survival.length === 1; }), true);

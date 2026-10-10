@@ -56,16 +56,47 @@ NE.Renderer = class {
     this.glow(color, 12); this.circle(0, 0, r * .13, '#e5fff2'); this.circle(0, 0, r * .27, color + '25');
     // Eyes point toward the creature's heading.
     this.circle(r * .46, -r * .22, Math.max(1.6, r * .065), '#e7ffef'); this.circle(r * .46, r * .22, Math.max(1.6, r * .065), '#e7ffef');
+    if (player) this.drawPaint(e, time);
     c.shadowBlur = 0; c.restore();
     if (player && !menu) {
       c.save(); c.textAlign = 'center'; c.font = '8px monospace'; c.fillStyle = color; c.globalAlpha = .7; c.fillText('LV ' + e.level, e.x, e.y - r - 18); c.restore();
       if (e.invulnerable > 0) { c.lineWidth = 2; this.circle(e.x, e.y, r + 8, '#ffffff66', true); }
     }
   }
-  background() {
+  drawPaint(e, time) {
+    const skin = NE.Progress.paint(e.paint), c = this.ctx, r = e.r;
+    if (skin.pattern === 'natural') return;
+    c.save(); c.strokeStyle = skin.accent + 'aa'; c.fillStyle = skin.accent + '55'; c.lineWidth = Math.max(.8, r * .016); this.glow(skin.accent, 6);
+    const ring = radius => this.circle(0, 0, radius, skin.accent + '88', true);
+    if (skin.pattern === 'orbit') {
+      ring(r * 1.16); for (let i = 0; i < 3; i++) { const a = time * .65 + i * Math.PI * 2 / 3; this.circle(Math.cos(a) * r * 1.16, Math.sin(a) * r * 1.16, r * .055, skin.accent); }
+    } else if (['crystal', 'prism', 'crown'].includes(skin.pattern)) {
+      const n = skin.pattern === 'crown' ? 10 : 6;
+      for (let i = 0; i < n; i++) { c.save(); c.rotate(i * Math.PI * 2 / n + time * .12); c.beginPath(); c.moveTo(r * .77, -r * .1); c.lineTo(r * (skin.pattern === 'crown' ? 1.33 : 1.1), 0); c.lineTo(r * .77, r * .1); if (skin.pattern === 'prism') c.lineTo(r * .6, 0); c.closePath(); c.fill(); c.stroke(); c.restore(); }
+    } else if (skin.pattern === 'petals') {
+      for (let i = 0; i < 6; i++) { c.save(); c.rotate(i * Math.PI / 3 + time * .15); c.beginPath(); c.ellipse(r * .56, 0, r * .31, r * .12, 0, 0, Math.PI * 2); c.stroke(); c.restore(); }
+    } else if (skin.pattern === 'sparks' || skin.pattern === 'nebula') {
+      for (let i = 0; i < 14; i++) { const a = i * 2.4 + time * (skin.pattern === 'sparks' ? .9 : .16), rr = r * (.25 + i % 5 * .13); this.circle(Math.cos(a) * rr, Math.sin(a) * rr, r * (i % 2 ? .035 : .055), i % 2 ? skin.accent : skin.color); }
+    } else if (skin.pattern === 'circuit') {
+      for (let i = -1; i <= 1; i++) { c.beginPath(); c.moveTo(-r * .6, i * r * .22); c.lineTo(-r * .12, i * r * .22); c.lineTo(r * .2, i * r * .22 + r * .12); c.lineTo(r * .58, i * r * .22 + r * .12); c.stroke(); }
+    } else if (skin.pattern === 'bubbles') {
+      for (let i = 0; i < 5; i++) this.circle(Math.cos(i * 2.4 + time * .3) * r * .5, Math.sin(i * 2.4 + time * .3) * r * .5, r * (.09 + i % 2 * .05), skin.accent + '99', true);
+    } else if (skin.pattern === 'void') { this.circle(0, 0, r * .38, '#071019'); ring(r * .47); this.circle(0, 0, r * .05, skin.accent); }
+    else if (skin.pattern === 'aurora') {
+      for (let i = 0; i < 3; i++) { c.beginPath(); c.arc(0, 0, r * (.4 + i * .16), time * .6 + i, time * .6 + i + 2.6); c.stroke(); }
+    }
+    c.restore();
+  }
+  skinPreview(canvas, skin) {
+    const previous = this.ctx; this.ctx = canvas.getContext('2d');
+    this.ctx.clearRect(0, 0, canvas.width, canvas.height);
+    this.organism({ x: canvas.width / 2, y: canvas.height / 2, r: 27, angle: -.65, stage: NE.Save.data.selectedForm, paint: skin.id, seed: 0, flash: 0 }, skin.color || NE.forms[NE.Save.data.selectedForm].color, this.menuTime, true, true);
+    this.ctx = previous;
+  }
+  background(color = '#67c8a0') {
     const c = this.ctx; c.fillStyle = '#080d14'; c.fillRect(0, 0, this.width, this.height);
     const g = c.createRadialGradient(this.width * .63, this.height * .45, 0, this.width * .63, this.height * .45, Math.max(this.width, this.height) * .65);
-    g.addColorStop(0, '#112d302e'); g.addColorStop(.5, '#0c1b2522'); g.addColorStop(1, '#080d1400'); c.fillStyle = g; c.fillRect(0, 0, this.width, this.height);
+    g.addColorStop(0, color + '0e'); g.addColorStop(.5, '#0c1b2522'); g.addColorStop(1, '#080d1400'); c.fillStyle = g; c.fillRect(0, 0, this.width, this.height);
   }
   menu(dt) {
     this.menuTime += dt; const t = this.menuTime, c = this.ctx; c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); this.background();
@@ -75,10 +106,10 @@ NE.Renderer = class {
     c.globalAlpha = 1; c.shadowBlur = 0;
     const box = document.querySelector('.specimen').getBoundingClientRect();
     const r = this.width < 480 ? 47 : this.width < 760 ? 52 : this.width < 1100 ? 81 : 98;
-    const s = NE.Save.data.selectedForm, e = { x: box.left + box.width * .5 + Math.sin(t * .55) * 5, y: box.top + box.height * .43 + Math.cos(t * .65) * 7, r, angle: -.65 + Math.sin(t * .2) * .2, stage: s, seed: 0, flash: 0 };
+    const s = NE.Save.data.selectedForm, e = { x: box.left + box.width * .5 + Math.sin(t * .55) * 5, y: box.top + box.height * .43 + Math.cos(t * .65) * 7, r, angle: -.65 + Math.sin(t * .2) * .2, stage: s, paint: NE.Save.data.cosmetics.selected, seed: 0, flash: 0 };
     // A broad halo preserves contrast while avoiding external image assets.
     const g = c.createRadialGradient(e.x, e.y, 0, e.x, e.y, r * 2.5); g.addColorStop(0, '#70d6a01a'); g.addColorStop(1, '#70d6a000'); c.fillStyle = g; c.fillRect(e.x - r * 3, e.y - r * 3, r * 6, r * 6);
-    this.organism(e, NE.forms[s].color, t, true, true);
+    this.organism(e, NE.Progress.color(e), t, true, true);
     for (let i = 0; i < 7; i++) { const a = i * .89 + t * .12, d = r * (1.55 + i % 3 * .42); c.globalAlpha = .5; this.glow('#9effcb', 9); this.circle(e.x + Math.cos(a) * d, e.y + Math.sin(a) * d, 1.6 + i % 2, '#a6ffce'); }
     c.globalAlpha = 1; c.shadowBlur = 0;
   }
@@ -92,12 +123,12 @@ NE.Renderer = class {
     const c = this.ctx, p = game.player, cam = this.camera, t = game.time;
     const follow = 1 - Math.exp(-6 * dt); cam.x += (p.x - cam.x) * follow; cam.y += (p.y - cam.y) * follow;
     const targetZoom = NE.clamp(1.05 - (p.r - 17) / 130, .48, 1.05) * (this.width < 600 ? .85 : 1); cam.zoom += (targetZoom - cam.zoom) * (1 - Math.exp(-1.4 * dt));
-    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); this.background();
+    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); this.background(game.sector?.color);
     const shake = NE.Save.data.settings.shake && game.shake > 0 ? game.shake * 4 : 0;
     c.save(); c.translate(this.width / 2 + Math.sin(t * 83) * shake, this.height / 2 + Math.cos(t * 73) * shake); c.scale(cam.zoom, cam.zoom); c.translate(-cam.x, -cam.y);
     this.drawGround(game);
     for (const e of game.enemies) if (this.visible(e)) this.trail(e, NE.species[e.type].color);
-    this.trail(p, NE.forms[p.stage].color);
+    this.trail(p, NE.Progress.color(p));
     for (const f of game.food) if (!f.dead && this.visible(f, 10)) {
       const alpha = .66 + Math.sin(t * 3 + f.seed) * .16; c.globalAlpha = alpha; this.glow(f.special ? '#e5ff85' : '#85fbd0', f.special ? 13 : 7);
       if (f.special) { c.save(); c.translate(f.x, f.y); c.rotate(t + f.seed); c.fillStyle = '#e2ff91'; c.fillRect(-f.r * .6, -f.r * .6, f.r * 1.2, f.r * 1.2); c.restore(); }
@@ -119,7 +150,7 @@ NE.Renderer = class {
       const radius = 210 * (1 + p.upgrades.vortex * .22);
       for (let i = 0; i < 4; i++) { c.beginPath(); for (let j = 0; j <= 30; j++) { const a = j / 30 * Math.PI * 1.2 + i * Math.PI / 2, r = radius * (1 - j / 42); if (!j) c.moveTo(Math.cos(a) * r, Math.sin(a) * r); else c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.stroke(); } c.restore();
     }
-    if (!p.dead) this.organism(p, p.phase > 0 ? '#aefaff' : NE.forms[p.stage].color, t, true);
+    if (!p.dead) this.organism(p, p.phase > 0 ? '#aefaff' : NE.Progress.color(p), t, true);
     for (const shot of game.projectiles) { this.glow('#ff6a9b', 11); this.circle(shot.x, shot.y, shot.r, '#ff90b4'); }
     c.shadowBlur = 0;
     for (const wave of game.waves) { c.lineWidth = 5; this.circle(wave.x, wave.y, wave.r, '#ff6a9b55', true); c.lineWidth = 1; this.circle(wave.x, wave.y, wave.r + 7, '#ff6a9b88', true); }
@@ -128,6 +159,7 @@ NE.Renderer = class {
     c.globalAlpha = 1; c.shadowBlur = 0;
     for (const label of game.labels) { c.save(); c.globalAlpha = Math.min(1, label.life); c.textAlign = 'center'; c.font = 'bold 11px monospace'; c.fillStyle = label.color; c.fillText(label.text, label.x, label.y); c.restore(); }
     c.restore();
+    if (game.biome === 'abyss') { const fog = c.createRadialGradient(this.width / 2, this.height / 2, Math.min(this.width, this.height) * .16, this.width / 2, this.height / 2, Math.max(this.width, this.height) * .6); fog.addColorStop(0, '#05071200'); fog.addColorStop(1, '#050712e0'); c.fillStyle = fog; c.fillRect(0, 0, this.width, this.height); }
     this.drawArrow(game);
     if (p.hp < p.maxHp * .25 && game.state === 'running') { const g = c.createRadialGradient(this.width / 2, this.height / 2, this.width * .15, this.width / 2, this.height / 2, Math.max(this.width, this.height) * .7); g.addColorStop(0, '#ff174a00'); g.addColorStop(1, '#ff174a28'); c.fillStyle = g; c.fillRect(0, 0, this.width, this.height); }
     this.mapTimer += dt; if (this.mapTimer >= .12) { this.minimap(game); this.mapTimer = 0; }
@@ -140,6 +172,13 @@ NE.Renderer = class {
     c.font = '10px monospace'; c.fillStyle = '#36525666'; c.textAlign = 'left';
     for (let x = 600; x < NE.C.width; x += 600) for (let y = 600; y < NE.C.height; y += 600) if (x > minX && x < maxX && y > minY && y < maxY) c.fillText('СЕКТОР ' + Math.floor(x / 600) + '.' + Math.floor(y / 600), x, y);
     for (const reef of this.decor) if (this.visible(reef)) { c.save(); c.translate(reef.x, reef.y); c.rotate(reef.seed); c.strokeStyle = '#3156493b'; c.lineWidth = 1; for (let j = 0; j < 5; j++) { const a = j * 1.3; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(Math.cos(a + .4) * reef.r, Math.sin(a + .4) * reef.r, Math.cos(a) * reef.r * 1.8, Math.sin(a) * reef.r * 1.8); c.stroke(); } c.restore(); }
+    if (game.biome === 'current') {
+      c.strokeStyle = '#7cbaff33'; c.lineWidth = 1;
+      for (let x = Math.floor(minX / 180) * 180; x < maxX; x += 180) for (let y = Math.floor(minY / 180) * 180; y < maxY; y += 180) { const flow = game.currentAt(x, y), angle = Math.atan2(flow.y, flow.x); c.save(); c.translate(x, y); c.rotate(angle); c.beginPath(); c.moveTo(-22, 0); c.lineTo(22, 0); c.lineTo(14, -5); c.moveTo(22, 0); c.lineTo(14, 5); c.stroke(); c.restore(); }
+    }
+    for (const zone of game.terrain) if (this.visible(zone, zone.r)) {
+      const active = game.terrainActive(zone), col = active ? '#ff6a9b' : '#dfb7ff'; c.lineWidth = 1.5; this.circle(zone.x, zone.y, zone.r, col + (active ? '18' : '05')); this.circle(zone.x, zone.y, zone.r, col + (active ? '88' : '55'), true); c.font = '9px monospace'; c.fillStyle = col + 'aa'; c.textAlign = 'center'; c.fillText(active ? 'ИОННЫЙ РАЗРЯД' : 'ПОЛЕ ЗАРЯЖАЕТСЯ', zone.x, zone.y);
+    }
     const event = game.event;
     if (event) {
       if (event.type === 'storm') for (const zone of event.zones) { const active = event.age > 2; c.fillStyle = active ? '#ff6a9b15' : '#ff6a9b08'; c.strokeStyle = active ? '#ff6a9b77' : '#ff6a9b44'; c.lineWidth = 2; this.circle(zone.x, zone.y, zone.r, c.fillStyle); this.circle(zone.x, zone.y, zone.r * (1 + Math.sin(game.time * 4) * .02), c.strokeStyle, true); c.textAlign = 'center'; c.font = '10px monospace'; c.fillStyle = '#ff6a9b99'; c.fillText(active ? 'ИОННОЕ ПОЛЕ' : 'РАЗРЯД ЧЕРЕЗ 2 СЕК', zone.x, zone.y); }
@@ -154,7 +193,7 @@ NE.Renderer = class {
     this.organism({ ...b, type: 4, angle: b.angle + game.time * .1 }, b.flash > 0 ? '#fff2f8' : '#ff6a9b', game.time);
     c.translate(b.x, b.y); c.rotate(-game.time * .4); this.glow('#ff6a9b', 12); c.strokeStyle = '#ff6a9b99'; c.lineWidth = 2;
     for (let i = 0; i < 6; i++) { c.beginPath(); c.arc(0, 0, b.r * 1.38, i * Math.PI / 3, i * Math.PI / 3 + .55); c.stroke(); } c.restore();
-    c.fillStyle = '#ff9fc0'; c.font = '10px monospace'; c.textAlign = 'center'; c.fillText('АРХОНТ · ' + ['I', 'II', 'III'][b.phase - 1], b.x, b.y - b.r * 1.55); c.shadowBlur = 0;
+    c.fillStyle = '#ff9fc0'; c.font = '10px monospace'; c.textAlign = 'center'; c.fillText((b.empowered ? 'ВЕРХОВНЫЙ АРХОНТ' : 'АРХОНТ') + ' · ' + ['I', 'II', 'III'][b.phase - 1], b.x, b.y - b.r * 1.55); c.shadowBlur = 0;
   }
   drawArrow(game) {
     const c = this.ctx, target = game.boss && !game.boss.dead ? game.boss : game.event && game.event.type !== 'storm' ? game.event : null;
@@ -171,6 +210,7 @@ NE.Renderer = class {
     for (let i = 1; i < 4; i++) { c.beginPath(); c.moveTo(w / 4 * i, 0); c.lineTo(w / 4 * i, h); c.moveTo(0, h / 4 * i); c.lineTo(w, h / 4 * i); c.stroke(); }
     if (game.event) { c.strokeStyle = '#b4ff9866'; if (game.event.type === 'storm') { c.strokeStyle = '#ff6a9b88'; for (const z of game.event.zones) { c.beginPath(); c.arc(z.x * sx, z.y * sy, z.r * sx, 0, Math.PI * 2); c.stroke(); } } else { c.beginPath(); c.arc(game.event.x * sx, game.event.y * sy, game.event.r * sx, 0, Math.PI * 2); c.stroke(); } }
     for (const e of game.enemies) { c.fillStyle = game.relation(e) === 'danger' ? '#ff6a9b99' : '#76ccb766'; c.fillRect(e.x * sx, e.y * sy, 2, 2); }
+    for (const z of game.terrain) { c.strokeStyle = game.terrainActive(z) ? '#ff6a9b66' : '#dfb7ff44'; c.beginPath(); c.arc(z.x * sx, z.y * sy, z.r * sx, 0, Math.PI * 2); c.stroke(); }
     if (game.boss && !game.boss.dead) { c.fillStyle = '#ff6a9b'; c.fillRect(game.boss.x * sx - 3, game.boss.y * sy - 3, 6, 6); }
     const p = game.player; c.strokeStyle = '#a6ffce33'; c.strokeRect((p.x - this.width / this.camera.zoom / 2) * sx, (p.y - this.height / this.camera.zoom / 2) * sy, this.width / this.camera.zoom * sx, this.height / this.camera.zoom * sy); c.fillStyle = '#c7ffdc'; c.beginPath(); c.arc(p.x * sx, p.y * sy, 3, 0, Math.PI * 2); c.fill();
   }

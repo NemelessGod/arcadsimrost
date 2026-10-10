@@ -1,6 +1,6 @@
 'use strict';
 window.NE = {};
-NE.C = { width: 3600, height: 2600, foodCap: 420, enemyCap: 84, particleCap: 360, projectileCap: 72, step: 1 / 60, bossTime: 240 };
+NE.C = { width: 3600, height: 2600, foodCap: 420, enemyCap: 84, particleCap: 360, projectileCap: 72, step: 1 / 60, bossTime: 240, preyXpCap: 100, preyMassCap: 70 };
 NE.clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 NE.rand = (a, b) => a + Math.random() * (b - a);
 NE.distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -55,3 +55,48 @@ NE.achievements = [
   { id: 'boss', name: 'Новый архонт', desc: 'Победить босса' },
   { id: 'score', name: 'Неоновая легенда', desc: 'Набрать 10 000 очков' }
 ];
+
+NE.sectors = [
+  { id: 0, name: 'Колыбель', biome: 'nursery', color: '#a6ffce', accent: '#295640', difficulty: .8, population: 44, food: 350, bossTime: null, goals: [{ key: 'food', target: 40, label: 'Энергия' }, { key: 'level', target: 4, label: 'Уровень' }], description: 'Соберите 40 частиц и достигните уровня 4.', rule: 'Мягкая экосистема. Здесь начинается ваша экспедиция.', prize: 100, starScore: 1200 },
+  { id: 1, name: 'Стеклянный риф', biome: 'reef', color: '#4ce6e0', accent: '#225765', difficulty: .95, population: 56, food: 360, bossTime: null, goals: [{ key: 'kills', target: 8, label: 'Поглощения' }, { key: 'level', target: 7, label: 'Уровень' }], description: 'Поглотите 8 существ и достигните уровня 7.', rule: 'Густой риф с быстрыми стаями и богатой пищевой цепью.', prize: 140, starScore: 3500 },
+  { id: 2, name: 'Живые течения', biome: 'current', color: '#7cbaff', accent: '#234563', difficulty: 1.05, population: 58, food: 340, bossTime: null, goals: [{ key: 'time', target: 110, label: 'Выживание' }, { key: 'kills', target: 8, label: 'Поглощения' }], description: 'Проживите 1:50 и поглотите 8 существ.', rule: 'Течения сносят организмы. Ускорение помогает удерживать курс.', prize: 180, starScore: 6500 },
+  { id: 3, name: 'Ионные пустоши', biome: 'storm', color: '#e599ff', accent: '#49315c', difficulty: 1.15, population: 62, food: 340, bossTime: null, goals: [{ key: 'events', target: 2, label: 'События' }, { key: 'mass', target: 300, label: 'Масса' }], description: 'Завершите 2 события и наберите 300 массы.', rule: 'Поля разряжаются по циклу. Ищите безопасные проходы и следите за предупреждением.', prize: 230, starScore: 8500 },
+  { id: 4, name: 'Бездна', biome: 'abyss', color: '#9c92ff', accent: '#27213e', difficulty: 1.35, population: 66, food: 300, bossTime: null, goals: [{ key: 'level', target: 13, label: 'Уровень' }, { key: 'kills', target: 18, label: 'Поглощения' }], description: 'Достигните уровня 13 и поглотите 18 существ.', rule: 'Света меньше, хищников больше. Мини-карта и фазовый сдвиг помогут выжить.', prize: 300, starScore: 11500 },
+  { id: 5, name: 'Сердце Архонта', biome: 'core', color: '#ff84ba', accent: '#542638', difficulty: 1.4, population: 70, food: 350, bossTime: 100, goals: [{ key: 'bosses', target: 1, label: 'Архонт' }], description: 'Победите усиленного Архонта.', rule: 'Ионные поля и усиленный босс. Он пробуждается через 1:40 или на пятой стадии.', prize: 450, starScore: 15000 }
+];
+NE.leagues = [
+  { id: 'spore', name: 'Спора', points: 0, color: '#a6ffce', icon: '◇', prize: 40 },
+  { id: 'bronze', name: 'Бронза', points: 200, color: '#dda47c', icon: '◆', prize: 90 },
+  { id: 'silver', name: 'Серебро', points: 650, color: '#c3dfed', icon: '❖', prize: 160 },
+  { id: 'gold', name: 'Золото', points: 1400, color: '#ffdb8c', icon: '✦', prize: 250, skin: 'archon' },
+  { id: 'platinum', name: 'Платина', points: 2500, color: '#9effe4', icon: '✧', prize: 380 },
+  { id: 'neon', name: 'Неон', points: 4200, color: '#ff8fd2', icon: '♛', prize: 600 }
+];
+NE.paints = [
+  { id: 'mint', name: 'Живая искра', color: null, accent: '#a6ffce', pattern: 'natural', price: 0, rarity: 'Базовый' },
+  { id: 'solar', name: 'Солнечный ген', color: '#ffd280', accent: '#ff9865', pattern: 'orbit', price: 180, rarity: 'Редкий' },
+  { id: 'glacier', name: 'Ледяной осколок', color: '#8cf0ff', accent: '#c9faff', pattern: 'crystal', price: 220, rarity: 'Редкий' },
+  { id: 'orchid', name: 'Орхидея', color: '#d4a0ff', accent: '#ff8ee6', pattern: 'petals', price: 260, rarity: 'Редкий' },
+  { id: 'ember', name: 'Тлеющее ядро', color: '#ff9e7c', accent: '#ffd491', pattern: 'sparks', price: 320, rarity: 'Редкий' },
+  { id: 'mono', name: 'Белый шум', color: '#e6f4f7', accent: '#91becb', pattern: 'circuit', price: 350, rarity: 'Редкий' },
+  { id: 'toxic', name: 'Токсичный цветок', color: '#d2ff7f', accent: '#53eeb1', pattern: 'bubbles', price: 400, rarity: 'Эпический' },
+  { id: 'prism', name: 'Призма', color: '#ff9be3', accent: '#7fe8ff', pattern: 'prism', price: 650, rarity: 'Эпический' },
+  { id: 'void', name: 'Нулевая материя', color: '#819fff', accent: '#53efff', pattern: 'void', price: 0, path: 5, rarity: 'Экспедиционный' },
+  { id: 'aurora', name: 'Полярное сияние', color: '#84ffdd', accent: '#b7a0ff', pattern: 'aurora', price: 0, path: 10, rarity: 'Экспедиционный' },
+  { id: 'nebula', name: 'Туманность', color: '#ffdca0', accent: '#c49aff', pattern: 'nebula', price: 0, path: 15, rarity: 'Легендарный' },
+  { id: 'archon', name: 'Ген Архонта', color: '#ff85ba', accent: '#fff0b6', pattern: 'crown', price: 0, league: 'gold', rarity: 'Легендарный' }
+];
+NE.pathRewards = Array.from({ length: 15 }, (_, i) => ({ step: i + 1, xp: (i + 1) * 240, crystals: 40 + (i + 1) * 8, skin: { 5: 'void', 10: 'aurora', 15: 'nebula' }[i + 1] || null }));
+NE.contractPool = [
+  { id: 'energy', key: 'food', target: 120, name: 'Световой урожай', description: 'Соберите 120 частиц энергии.', prize: 65 },
+  { id: 'hunt', key: 'kills', target: 12, name: 'Открытая охота', description: 'Поглотите 12 существ.', prize: 80 },
+  { id: 'skills', key: 'abilities', target: 18, name: 'Мастер генов', description: 'Используйте способности 18 раз.', prize: 70 },
+  { id: 'events', key: 'events', target: 2, name: 'Живая экосистема', description: 'Завершите 2 события.', prize: 100 },
+  { id: 'boss', key: 'bosses', target: 1, name: 'Смена власти', description: 'Победите одного Архонта.', prize: 140 },
+  { id: 'time', key: 'time', target: 240, name: 'Долгая жизнь', description: 'Проживите суммарно 4 минуты.', prize: 75 }
+];
+NE.achievements.push(
+  { id: 'expedition', name: 'Атлас покорён', desc: 'Завершить все 6 секторов экспедиции' },
+  { id: 'collector', name: 'Хранитель света', desc: 'Собрать 6 разных скинов' },
+  { id: 'goldLeague', name: 'Золотой ген', desc: 'Достичь Золотой лиги' }
+);

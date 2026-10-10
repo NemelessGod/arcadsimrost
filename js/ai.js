@@ -50,14 +50,14 @@ NE.AI = {
       b.x += b.vx * dt; b.y += b.vy * dt;
       if (b.timer <= 0) { b.state = 'recover'; b.timer = phase === 3 ? .8 : 1.5; }
     } else if (b.state === 'telegraph') {
-      if (b.timer <= 0) { const angle = Math.atan2(b.targetY - b.y, b.targetX - b.x); b.vx = Math.cos(angle) * (phase === 3 ? 440 : 340); b.vy = Math.sin(angle) * (phase === 3 ? 440 : 340); b.angle = angle; b.state = 'charge'; b.timer = .85; }
+      if (b.timer <= 0) { const angle = Math.atan2(b.targetY - b.y, b.targetX - b.x), power = b.empowered ? 1.12 : 1; b.vx = Math.cos(angle) * (phase === 3 ? 440 : 340) * power; b.vy = Math.sin(angle) * (phase === 3 ? 440 : 340) * power; b.angle = angle; b.state = 'charge'; b.timer = .85; }
     } else {
       const dx = p.x - b.x, dy = p.y - b.y, d = Math.hypot(dx, dy) || 1; b.angle = Math.atan2(dy, dx);
       if (d > b.r + p.r + 110 && b.state !== 'recover') { b.x += dx / d * 53 * dt; b.y += dy / d * 53 * dt; }
       if (b.timer <= 0) {
         b.attackCount++;
         if (b.attackCount % 2 === 0) {
-          for (let i = 0; i < 10 + phase * 3; i++) { const angle = i / (10 + phase * 3) * Math.PI * 2 + b.attackCount * .23; game.projectile(b.x, b.y, angle, phase === 3 ? 200 : 150, 16 + phase * 3); }
+          for (let i = 0; i < 10 + phase * 3; i++) { const angle = i / (10 + phase * 3) * Math.PI * 2 + b.attackCount * .23; game.projectile(b.x, b.y, angle, (phase === 3 ? 200 : 150) * (b.empowered ? 1.15 : 1), (16 + phase * 3) * (b.empowered ? 1.2 : 1)); }
           if (phase === 3) game.wave(b.x, b.y, 430, 14);
           b.state = 'recover'; b.timer = phase === 3 ? 1.4 : 2.6;
           game.ring(b.x, b.y, '#ff6a9b', 150, .5);

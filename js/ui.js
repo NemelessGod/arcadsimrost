@@ -12,15 +12,19 @@ NE.UI = (() => {
     requestAnimationFrame(() => { const button = content.querySelector('button:not(:disabled), input, select'); (button || $('dialog-close')).focus({ preventScroll: true }); });
   }
   function menuStats() {
-    const s = NE.Save.data.selectedForm, form = NE.forms[s]; $('best-score').textContent = String(NE.Save.best()).padStart(6, '0'); $('specimen-name').textContent = form.name; $('specimen-trait').textContent = form.trait; $('specimen-id').textContent = 'NE–00' + (s + 1);
+    const s = NE.Save.data.selectedForm, form = NE.forms[s]; $('best-score').textContent = String(NE.Save.best()).padStart(6, '0'); $('specimen-name').textContent = form.name; $('specimen-trait').textContent = `${NE.Progress.paint().name} · ${form.trait}`; $('specimen-id').textContent = 'NE–00' + (s + 1);
     document.querySelectorAll('.stage-dots i').forEach((n, i) => n.classList.toggle('on', i <= s)); document.querySelector('.stage-dots span').textContent = '0' + (s + 1) + ' / 05';
+    NE.Hub?.updateMenu();
   }
   function mainMenu() { NE.Input.reset(); NE.game = null; closeOverlay(); menu.hidden = false; hud.hidden = true; $('game-tip').hidden = true; returnToPause = false; menuStats(); $('play').focus({ preventScroll: true }); }
-  function start(tutorial = false) {
-    NE.Audio.unlock(); NE.Audio.play('click'); NE.Input.reset(); closeOverlay(); menu.hidden = true; hud.hidden = false; NE.game = new NE.Game(mode, tutorial); NE.renderer.camera = { x: NE.game.player.x, y: NE.game.player.y, zoom: innerWidth < 600 ? .85 : 1.05 }; returnToPause = false;
-    $('game-tip').hidden = !tutorial; updateHUD(NE.game); if (tutorial) updateTutorial(NE.game); else toast('Бирюзовые — добыча · жёлтые — равные · розовые — опасность');
+  function start(tutorial = false, options = {}) {
+    if (options.mode === 'campaign' && !NE.Progress.isSectorUnlocked(options.sectorId)) { toast('Сначала завершите предыдущий сектор.'); return false; }
+    NE.Audio.unlock(); NE.Audio.play('click'); NE.Input.reset(); closeOverlay(); menu.hidden = true; hud.hidden = false; NE.game = new NE.Game(options.mode || mode, tutorial, options); NE.renderer.camera = { x: NE.game.player.x, y: NE.game.player.y, zoom: innerWidth < 600 ? .85 : 1.05 }; returnToPause = false;
+    $('game-tip').hidden = !tutorial; updateHUD(NE.game); if (tutorial) updateTutorial(NE.game); else toast(NE.game.sector ? `${NE.game.sector.name} · ${NE.game.sector.description}` : 'Бирюзовые — добыча · жёлтые — равные · розовые — опасность');
     document.activeElement?.blur();
+    return true;
   }
+  function restart() { const g = NE.game; start(false, g?.sector ? { mode: 'campaign', sectorId: g.sector.id } : { mode: g?.mode || mode }); }
   function resume() { const g = NE.game; if (!g || g.state !== 'paused') return; g.state = 'running'; closeOverlay(); NE.Input.reset(); document.activeElement?.blur(); }
   function pause(reason = '') {
     const g = NE.game; if (!g || !['running', 'paused'].includes(g.state)) return; g.state = 'paused'; NE.Input.reset(); returnToPause = true;
@@ -45,8 +49,8 @@ NE.UI = (() => {
   }
   function records(tab = recordTab) {
     recordTab = tab; const save = NE.Save.data;
-    const body = tab === 'achievements' ? `<div class="achievement-grid">${NE.achievements.map(a => `<div class="achievement ${save.achievements.includes(a.id) ? 'earned' : ''}"><b>${save.achievements.includes(a.id) ? '✦' : '◇'} ${a.name}</b><small>${a.desc}</small></div>`).join('')}</div>` : save.records[tab].length ? `<table class="records-table"><thead><tr><th>#</th><th>ОЧКИ</th><th>ВРЕМЯ</th><th>ФОРМА</th><th>ИСХОД</th></tr></thead><tbody>${save.records[tab].map((r, i) => `<tr><td>${String(i + 1).padStart(2, '0')}</td><td>${r.score.toLocaleString('ru-RU')}</td><td>${NE.time(r.time)}</td><td>${NE.forms[r.stage].name}</td><td>${r.win ? '✦ Победа' : 'Конец забега'}</td></tr>`).join('')}</tbody></table>` : '<div class="empty-message">Твоя история ещё впереди. Заверши первый забег!</div>';
-    open('records', `<span class="eyebrow">ТВОЯ ИСТОРИЯ ЭВОЛЮЦИИ</span><h2 id="dialog-title">След в экосистеме.</h2><p>Лучшие 10 завершённых забегов в каждом режиме. Достижения: ${save.achievements.length} / ${NE.achievements.length}.</p><div class="record-tabs"><button data-tab="survival" class="${tab === 'survival' ? 'active' : ''}">Выживание</button><button data-tab="endless" class="${tab === 'endless' ? 'active' : ''}">Бесконечность</button><button data-tab="achievements" class="${tab === 'achievements' ? 'active' : ''}">Достижения</button></div>${body}`, true);
+    const body = tab === 'achievements' ? `<div class="achievement-grid">${NE.achievements.map(a => `<div class="achievement ${save.achievements.includes(a.id) ? 'earned' : ''}"><b>${save.achievements.includes(a.id) ? '✦' : '◇'} ${a.name}</b><small>${a.desc}</small></div>`).join('')}</div>` : save.records[tab].length ? `<table class="records-table"><thead><tr><th>#</th><th>ОЧКИ</th><th>ВРЕМЯ</th><th>${tab === 'campaign' ? 'СЕКТОР' : 'ФОРМА'}</th><th>ИСХОД</th></tr></thead><tbody>${save.records[tab].map((r, i) => `<tr><td>${String(i + 1).padStart(2, '0')}</td><td>${r.score.toLocaleString('ru-RU')}</td><td>${NE.time(r.time)}</td><td>${tab === 'campaign' ? NE.sectors[r.sector ?? 0].name : NE.forms[r.stage].name}</td><td>${r.win ? '✦ Победа' : 'Конец забега'}</td></tr>`).join('')}</tbody></table>` : '<div class="empty-message">Твоя история ещё впереди. Заверши первый забег!</div>';
+    open('records', `<span class="eyebrow">ТВОЯ ИСТОРИЯ ЭВОЛЮЦИИ</span><h2 id="dialog-title">След в экосистеме.</h2><p>Лучшие 10 завершённых забегов в каждом режиме. Достижения: ${save.achievements.length} / ${NE.achievements.length}.</p><div class="record-tabs"><button data-tab="survival" class="${tab === 'survival' ? 'active' : ''}">Выживание</button><button data-tab="endless" class="${tab === 'endless' ? 'active' : ''}">Бесконечность</button><button data-tab="campaign" class="${tab === 'campaign' ? 'active' : ''}">Экспедиция</button><button data-tab="achievements" class="${tab === 'achievements' ? 'active' : ''}">Достижения</button></div>${body}`, true);
   }
   function showUpgrade(game) {
     game.state = 'upgrade'; NE.Input.reset();
@@ -59,21 +63,23 @@ NE.UI = (() => {
   function result(game, win) {
     $('game-tip').hidden = true;
     const choices = NE.upgrades.filter(u => game.player.upgrades[u.id]).map(u => `${u.name} ×${game.player.upgrades[u.id]}`).join(' · ');
-    open('result', `<span class="eyebrow">${win ? 'АРХОНТ ПОВЕРЖЕН · ЭКОСИСТЕМА ТВОЯ' : 'КАЖДЫЙ КОНЕЦ — НОВОЕ НАЧАЛО'}</span><h2 id="dialog-title">${win ? 'Вершина пищевой цепи.' : 'Твоя искра оставила след.'}</h2><div class="result-score">${Math.floor(game.score).toLocaleString('ru-RU')} <span style="font-size:12px;letter-spacing:1px">ОЧКОВ</span></div><div class="result-grid"><div><small>ВРЕМЯ</small><strong>${NE.time(game.time)}</strong></div><div><small>ПОГЛОЩЕНИЯ</small><strong>${game.stats.kills}</strong></div><div><small>УРОВЕНЬ</small><strong>${game.player.level}</strong></div></div><p>Финальная форма: <span style="color:${NE.forms[game.player.stage].color}">${NE.forms[game.player.stage].name}</span> · Масса: ${Math.floor(game.player.mass)} μ · События: ${game.stats.events}<br>${game.saved ? 'Рекорд и открытые формы сохранены в этом браузере.' : 'Хранилище браузера недоступно: прогресс останется только в этой сессии.'}</p>${choices ? `<div class="result-upgrades">${choices}</div>` : ''}<button class="primary-button" data-ui="restart">ЕЩЁ ОДНА ЭВОЛЮЦИЯ <span>↗</span></button><div class="dialog-actions"><button class="secondary-button" data-ui="menu">В главное меню</button><button class="secondary-button" data-ui="result-records">Рекорды</button></div>`, false, false);
+    open('result', `<span class="eyebrow">${win ? game.sector ? `ЭКСПЕДИЦИЯ · СЕКТОР ${game.sector.id + 1} ЗАВЕРШЁН` : 'АРХОНТ ПОВЕРЖЕН · ЭКОСИСТЕМА ТВОЯ' : 'КАЖДЫЙ КОНЕЦ — НОВОЕ НАЧАЛО'}</span><h2 id="dialog-title">${win ? game.sector ? game.sector.name + ' покорён.' : 'Вершина пищевой цепи.' : 'Твоя искра оставила след.'}</h2><div class="result-score">${Math.floor(game.score).toLocaleString('ru-RU')} <span style="font-size:12px;letter-spacing:1px">ОЧКОВ</span></div><div class="result-grid"><div><small>ВРЕМЯ</small><strong>${NE.time(game.time)}</strong></div><div><small>ПОГЛОЩЕНИЯ</small><strong>${game.stats.kills}</strong></div><div><small>УРОВЕНЬ</small><strong>${game.player.level}</strong></div></div>${NE.Hub.resultPanel(game)}<p>Финальная форма: <span style="color:${NE.forms[game.player.stage].color}">${NE.forms[game.player.stage].name}</span> · Масса: ${Math.floor(game.player.mass)} μ · События: ${game.stats.events}<br>${game.saved ? 'Рекорд, награды и прогресс сохранены в этом браузере.' : 'Хранилище браузера недоступно: прогресс останется только в этой сессии.'}</p>${choices ? `<div class="result-upgrades">${choices}</div>` : ''}${game.sector && win && game.sector.id < 5 ? `<button class="primary-button" data-sector="${game.sector.id + 1}">СЛЕДУЮЩИЙ СЕКТОР <span>↗</span></button>` : ''}<button class="primary-button" data-ui="restart">${game.sector ? 'ПОВТОРИТЬ СЕКТОР' : 'ЕЩЁ ОДНА ЭВОЛЮЦИЯ'} <span>↗</span></button><div class="dialog-actions"><button class="secondary-button" data-ui="menu">В главное меню</button><button class="secondary-button" data-ui="result-records">Рекорды</button><button class="secondary-button" data-hub="prizes">Лиги и призы</button></div>`, false, false);
   }
   function updateHUD(g) {
     const p = g.player, stage = NE.forms[p.stage]; $('stage-label').textContent = `0${p.stage + 1} / 05 · ${stage.name.toUpperCase()}`; $('form-symbol').textContent = stage.icon; $('form-symbol').style.color = stage.color;
     $('level').textContent = p.level; $('mass').textContent = Math.floor(p.mass) + ' μ'; $('xp-fill').style.width = Math.min(100, p.xp / p.xpNext * 100) + '%'; $('xp-label').textContent = `${Math.floor(p.xp)} / ${p.xpNext} XP`;
     $('hp-fill').style.width = p.hp / p.maxHp * 100 + '%'; $('hp-label').textContent = `${Math.ceil(p.hp)} / ${p.maxHp}`; $('energy-fill').style.width = p.energy / p.maxEnergy * 100 + '%'; $('energy-label').textContent = `${Math.floor(p.energy)} / ${p.maxEnergy}`;
-    $('mode-label').textContent = g.mode === 'survival' ? 'ВЫЖИВАНИЕ' : 'БЕСКОНЕЧНОСТЬ'; $('run-clock').textContent = NE.time(g.time); $('score').textContent = String(Math.floor(g.score)).padStart(6, '0'); $('enemy-count').textContent = g.enemies.length + ' ОСОБЕЙ';
+    $('mode-label').textContent = g.sector ? g.sector.name.toUpperCase() : g.mode === 'survival' ? 'ВЫЖИВАНИЕ' : 'БЕСКОНЕЧНОСТЬ'; $('run-clock').textContent = NE.time(g.time); $('score').textContent = String(Math.floor(g.score)).padStart(6, '0'); $('enemy-count').textContent = g.enemies.length + ' ОСОБЕЙ';
     const q = g.quests[g.questIndex];
     if (q) { const progress = Math.min(q.goal, q.key === 'stage' ? p.stage : g.stats[q.key]); $('quest-title').textContent = q.text; $('quest-fill').style.width = progress / q.goal * 100 + '%'; $('quest-progress').textContent = `${progress} / ${q.goal} · +${q.xp} XP`; }
     else { $('quest-title').textContent = 'Все задачи выполнены'; $('quest-fill').style.width = '100%'; $('quest-progress').textContent = 'Продолжайте эволюцию!'; }
+    $('quest-type').textContent = g.sector ? `ЭКСПЕДИЦИЯ ${g.sector.id + 1} / 6` : 'ТЕКУЩАЯ ЗАДАЧА';
+    if (g.sector) { const mission = NE.Progress.campaignProgress(g); $('quest-title').textContent = g.sector.description; $('quest-fill').style.width = mission.fraction * 100 + '%'; $('quest-progress').textContent = mission.label; }
     $('next-evolution').textContent = p.stage === 4 ? 'Высшая форма достигнута' : `${NE.forms[p.stage + 1].name} · уровень ${NE.forms[p.stage + 1].level}`;
     document.querySelectorAll('[data-ability]').forEach(button => { const id = button.dataset.ability, ability = NE.abilities[id], cd = p.cooldowns[id], locked = p.level < ability.level; button.classList.toggle('locked', locked); button.classList.toggle('cooling', cd > 0); button.classList.toggle('ready', !locked && cd <= 0 && p.energy >= ability.cost); button.setAttribute('aria-label', `${ability.name}, ${locked ? 'открывается на уровне ' + ability.level : cd > 0 ? 'перезарядка ' + Math.ceil(cd) + ' секунд' : 'стоимость ' + ability.cost + ' энергии'}`); button.querySelector('small').textContent = locked ? 'Уровень ' + ability.level : cd > 0 ? Math.ceil(cd) + ' сек' : ability.cost + ' энергии'; button.querySelector('.cooldown').style.width = cd > 0 ? cd / (ability.cooldown * Math.max(.5, 1 - p.upgrades.cooldown * .1)) * 100 + '%' : '0%'; });
     $('boost-button').style.opacity = p.boostExhausted ? '.4' : '1';
     const threats = g.grid.query(p.x, p.y, 410, 'enemy').filter(e => g.relation(e) === 'danger'); $('danger-label').textContent = threats.length ? `▲ ХИЩНИК РЯДОМ · ${threats.length}` : '';
-    $('boss-hud').hidden = !g.boss || g.boss.dead; if (g.boss && !g.boss.dead) { $('boss-fill').style.width = Math.max(0, g.boss.hp / g.boss.maxHp * 100) + '%'; $('boss-phase').textContent = 'ФАЗА ' + ['I', 'II', 'III'][g.boss.phase - 1]; }
+    $('boss-hud').hidden = !g.boss || g.boss.dead; if (g.boss && !g.boss.dead) { $('boss-name').textContent = g.boss.empowered ? 'ВЕРХОВНЫЙ АРХОНТ' : 'АРХОНТ'; $('boss-fill').style.width = Math.max(0, g.boss.hp / g.boss.maxHp * 100) + '%'; $('boss-phase').textContent = 'ФАЗА ' + ['I', 'II', 'III'][g.boss.phase - 1]; }
     $('event-card').hidden = !g.event;
     if (g.event) { const e = g.event; $('event-title').textContent = { bloom: 'Энергетический расцвет', migration: 'Великая миграция', storm: 'Ионная буря' }[e.type]; $('event-description').textContent = e.completed ? 'Награда получена. Продолжайте охоту.' : { bloom: 'Соберите 12 золотых частиц в отмеченной области.', migration: 'Поглотите 3 быстрых странников.', storm: 'Избегайте розовых полей до конца события.' }[e.type]; $('event-time').textContent = `${Math.ceil(Math.max(0, e.duration - e.age))} сек${e.type !== 'storm' ? ` · ${e.progress} / ${e.type === 'bloom' ? 12 : 3}` : ''}${e.completed ? ' · ✓' : ''}`; }
   }
@@ -86,12 +92,12 @@ NE.UI = (() => {
     if (dialogKind === 'upgrade' || dialogKind === 'result') return;
     if (dialogKind === 'pause') { resume(); return; }
     if (returnToPause && NE.game?.state === 'paused') pause();
-    else if (NE.game?.state === 'result') result(NE.game, NE.game.mode === 'survival' && NE.game.stats.bosses > 0);
+    else if (NE.game?.state === 'result') result(NE.game, NE.game.win);
     else { closeOverlay(); menuStats(); }
   }
   function escape() { if (!overlay.hidden) closeDialog(); else if (NE.game?.state === 'running') pause(); }
   document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => { mode = button.dataset.mode; document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b === button)); NE.Audio.play('click'); }));
-  document.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click', () => ({ settings, tutorial, forms, records }[button.dataset.action])()));
+  document.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click', () => ({ settings, tutorial, forms, records, profile: () => NE.Hub.profile(), campaign: () => NE.Hub.campaign(), prizes: () => NE.Hub.prizes(), skins: () => NE.Hub.skins(), contracts: () => NE.Hub.contracts() }[button.dataset.action])()));
   $('play').addEventListener('click', () => start()); $('pause-button').addEventListener('click', () => pause()); $('dialog-close').addEventListener('click', closeDialog);
   document.querySelector('.brand').addEventListener('click', e => { e.preventDefault(); mainMenu(); });
   document.querySelectorAll('[data-ability]').forEach(button => {
@@ -105,12 +111,12 @@ NE.UI = (() => {
     if (target.dataset.upgrade) { NE.game?.applyUpgrade(target.dataset.upgrade); return; }
     if (target.dataset.form !== undefined) { const form = Number(target.dataset.form); if (NE.Save.data.forms.includes(form)) { NE.Save.data.selectedForm = form; NE.Save.persist(); forms(); menuStats(); } return; }
     if (target.dataset.tab) { records(target.dataset.tab); return; }
-    switch (target.dataset.ui) { case 'resume': resume(); break; case 'close': closeDialog(); break; case 'settings': settings(); break; case 'restart': start(); break; case 'menu': mainMenu(); break; case 'train': start(true); break; case 'result-records': records(); break; }
+    switch (target.dataset.ui) { case 'resume': resume(); break; case 'close': closeDialog(); break; case 'settings': settings(); break; case 'restart': restart(); break; case 'menu': mainMenu(); break; case 'train': start(true); break; case 'result-records': records(); break; }
   });
   overlay.addEventListener('keydown', e => {
-    if (e.key !== 'Tab') return; const focusable = [...dialog.querySelectorAll('button:not([hidden]):not(:disabled), input, select')]; const first = focusable[0], last = focusable.at(-1);
+    if (e.key !== 'Tab') return; const focusable = [...dialog.querySelectorAll('button:not([hidden]):not(:disabled), input:not([hidden]), select')].filter(node => node.getClientRects().length); const first = focusable[0], last = focusable.at(-1);
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
   });
   document.body.classList.toggle('touch', NE.Save.data.settings.touch); menuStats();
-  return { toast, start, mainMenu, pause, resume, settings, showUpgrade, result, updateHUD, updateTutorial, closeOverlay, escape };
+  return { toast, start, mainMenu, pause, resume, settings, showUpgrade, result, updateHUD, updateTutorial, closeOverlay, escape, open, menuStats };
 })();
