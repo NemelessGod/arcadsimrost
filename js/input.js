@@ -9,6 +9,7 @@ NE.Input = (() => {
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code)) e.preventDefault();
     NE.Audio.unlock(); keys.add(code);
     if (e.repeat) return;
+    if (NE.game?.state === 'upgrade' && /^(Digit|Numpad)[123]$/.test(code)) { e.preventDefault(); NE.game.applyUpgrade(NE.game.offered[Number(code.at(-1)) - 1]); return; }
     if (code === 'Escape') NE.UI?.escape();
     const ability = { KeyQ: 'pulse', KeyE: 'phase', KeyR: 'vortex' }[code];
     if (ability && NE.game?.state === 'running') NE.game.useAbility(ability);

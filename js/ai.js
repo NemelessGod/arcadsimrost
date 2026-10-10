@@ -44,7 +44,7 @@ NE.AI = {
   boss(b, game, dt) {
     const p = game.player, ratio = b.hp / b.maxHp;
     const phase = ratio < .32 ? 3 : ratio < .68 ? 2 : 1;
-    if (phase !== b.phase) { b.phase = phase; game.ring(b.x, b.y, '#ff6a9b', 220, .9); NE.UI.toast(`Архонт · фаза ${phase}. ${phase === 2 ? 'Появляются помощники!' : 'Осторожно: двойные волны!'}`, true); }
+    if (phase !== b.phase) { b.phase = phase; game.announce('АРХОНТ · ФАЗА ' + ['I', 'II', 'III'][phase - 1], phase === 2 ? 'НОВАЯ УГРОЗА · ПРИЗЫВ ПОМОЩНИКОВ' : 'ФИНАЛЬНАЯ ФАЗА · БЫСТРЫЕ РЫВКИ И ВОЛНЫ', '#ff719f'); game.ring(b.x, b.y, '#ff6a9b', 220, .9); NE.UI.toast(`Архонт · фаза ${phase}. ${phase === 2 ? 'Появляются помощники!' : 'Осторожно: двойные волны!'}`, true); }
     b.timer -= dt; b.flash = Math.max(0, b.flash - dt);
     if (b.state === 'charge') {
       b.x += b.vx * dt; b.y += b.vy * dt;

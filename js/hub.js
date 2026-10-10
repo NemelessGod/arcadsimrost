@@ -25,7 +25,7 @@ NE.Hub = (() => {
         if (file.size > 200000) throw new Error('Файл слишком большой');
         const result = NE.Save.importText(await file.text());
         document.body.classList.toggle('touch', NE.Save.data.settings.touch);
-        NE.Input.reset(); NE.Audio.volume(); NE.renderer.resize();
+        NE.Input.reset(); NE.Audio.volume(); NE.Visuals.apply(); NE.renderer.resize();
         updateMenu(); NE.UI.menuStats(); profile();
         NE.UI.toast(result.saved ? 'Профиль восстановлен из файла.' : 'Профиль загружен в память. Запись браузером запрещена.', !result.saved);
       } catch { NE.UI.toast('Не удалось прочитать сохранение. Текущий профиль сохранён.', true); }

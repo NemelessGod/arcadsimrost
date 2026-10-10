@@ -8,6 +8,7 @@ NE.Game = class {
     this.food = []; this.enemies = []; this.particles = []; this.rings = []; this.labels = []; this.projectiles = []; this.waves = []; this.boss = null; this.grid = new NE.Grid();
     this.stats = { food: 0, kills: 0, abilities: 0, events: 0, bosses: 0, distance: 0 }; this.pendingUpgrades = 0; this.offered = [];
     this.spawnTimer = 0; this.trailTimer = 0; this.shake = 0; this.event = null; this.eventIndex = this.biome === 'storm' ? 2 : 0; this.nextEvent = this.biome === 'storm' ? 12 : 40; this.nextBoss = this.sector ? (this.sector.bossTime ?? Infinity) : NE.C.bossTime; this.questIndex = 0; this.tutorialStep = 0;
+    this.announcement = null; this.lastHit = null;
     this.quests = [
       { text: 'Соберите 20 частиц энергии', key: 'food', goal: 20, xp: 36, mass: 6 },
       { text: 'Поглотите 4 слабых существа', key: 'kills', goal: 4, xp: 55, mass: 10 },
@@ -47,6 +48,7 @@ NE.Game = class {
     const p = this.player, stage = NE.forms.reduce((current, f, i) => p.level >= f.level ? i : current, 0);
     if (stage <= p.stage) return;
     p.stage = stage; p.maxHp += 15; p.hp = Math.min(p.maxHp, p.hp + 35); p.maxEnergy += 8; p.energy = p.maxEnergy; this.addMass(8 + stage * 5);
+    this.announce('ЭВОЛЮЦИЯ · ' + NE.forms[stage].name.toUpperCase(), stage === 1 ? 'ОТКРЫТ ФАЗОВЫЙ СДВИГ · E' : stage === 2 ? 'ОТКРЫТ ГРАВИТАЦИОННЫЙ ВИХРЬ · R' : 'НОВАЯ ФОРМА · БОЛЬШЕ ЖИЗНИ И ЭНЕРГИИ', NE.forms[stage].color);
     this.ring(p.x, p.y, NE.forms[stage].color, 230, 1.3); this.burst(p.x, p.y, NE.forms[stage].color, 60); NE.Audio.play('evolve'); NE.Save.unlockForm(stage); NE.UI.toast(`ЭВОЛЮЦИЯ · ${NE.forms[stage].name}. ${stage === 1 ? 'Открыт фазовый сдвиг [E]' : stage === 2 ? 'Открыт вихрь [R]' : 'Вы становитесь сильнее!'}`);
     if (stage >= 2) NE.Save.achievement('helix'); if (stage === 4) NE.Save.achievement('sovereign');
   }
@@ -74,9 +76,10 @@ NE.Game = class {
     this.burst(e.x, e.y, NE.species[e.type].color, 18, p); this.ring(e.x, e.y, '#a6ffce', e.r * 2.5, .4); this.label(e.x, e.y, '+' + Math.round(xp * (1 + p.upgrades.xp * .15)) + ' XP'); NE.Audio.play('absorb');
     NE.Save.achievement('predator'); if (this.stats.kills >= 25) NE.Save.achievement('hunter'); this.addXP(xp);
   }
-  hurt(amount) {
+  hurt(amount, source = { kind: 'unknown' }) {
     const p = this.player; if (p.dead || p.invulnerable > 0 || p.phase > 0 || this.state === 'result') return false;
     const reduction = NE.clamp(p.upgrades.armor * .1 + (p.skin === 3 ? .08 : 0), 0, .58), damage = amount * (1 - reduction);
+    this.lastHit = { kind: source.kind, type: source.type, damage: Math.ceil(damage), time: this.time };
     p.hp = Math.max(0, p.hp - damage); p.invulnerable = .75; p.flash = .25; this.shake = .7; this.burst(p.x, p.y, '#ff6a9b', 12); this.label(p.x, p.y - p.r, '−' + Math.ceil(damage), '#ff6a9b'); NE.Audio.play('hurt');
     if (p.hp <= 0) { p.dead = true; this.burst(p.x, p.y, NE.forms[p.stage].color, 65); this.end(false); } return true;
   }
@@ -108,6 +111,7 @@ NE.Game = class {
         const d = NE.distance(p, e) || 1;
         if (e.kind !== 'boss') { e.knockX = (e.x - p.x) / d * 330; e.knockY = (e.y - p.y) / d * 330; }
         this.damageEnemy(e, (30 + p.mass * .28) * (1 + p.upgrades.pulse * .15) * this.damageMultiplier());
+        if (this.state === 'result') break;
       }
     } else if (id === 'phase') { p.phase = 2.2 + p.upgrades.phase * .6; p.phaseHits.clear(); this.ring(p.x, p.y, '#d7ffff', p.r * 4, .55); }
     else { p.vortex = 3.6; this.ring(p.x, p.y, '#b4a1ff', 210 * (1 + p.upgrades.vortex * .22), .5); }
@@ -132,7 +136,7 @@ NE.Game = class {
   }
   updateEvent(dt) {
     const event = this.event; if (!event) return; event.age += dt;
-    if (event.type === 'storm' && event.age > 2) for (const z of event.zones) if (NE.distance(this.player, z) < z.r && this.player.phase <= 0) this.hurt(12);
+    if (event.type === 'storm' && event.age > 2) for (const z of event.zones) if (NE.distance(this.player, z) < z.r && this.player.phase <= 0) this.hurt(12, { kind: 'storm' });
     if (!event.completed && ((event.type === 'bloom' && event.progress >= 12) || (event.type === 'migration' && event.progress >= 3) || (event.type === 'storm' && event.age >= event.duration))) {
       if (this.state === 'result') return;
       event.completed = true; this.stats.events++; this.score += 600; this.addMass(10); this.player.hp = Math.min(this.player.maxHp, this.player.hp + 18); this.player.energy = this.player.maxEnergy; this.addXP(55); NE.Save.achievement('event'); if (event.type === 'storm') NE.Save.achievement('storm'); NE.UI.toast('Событие завершено · +600 очков · +55 XP'); NE.Audio.play('achievement');
@@ -144,10 +148,11 @@ NE.Game = class {
     const current = q.key === 'stage' ? this.player.stage : this.stats[q.key];
     if (current >= q.goal) { this.questIndex++; this.score += 300; this.addMass(q.mass); this.addXP(q.xp); this.player.hp = Math.min(this.player.maxHp, this.player.hp + 12); NE.UI.toast(`Задача выполнена · +${q.xp} XP · +${q.mass} массы`); }
   }
-  spawnBoss() { if (this.boss && !this.boss.dead) return; this.boss = NE.Entities.boss(this); if (this.biome === 'core') { this.boss.hp *= 1.35; this.boss.maxHp = this.boss.hp; this.boss.empowered = true; } this.ring(this.boss.x, this.boss.y, '#ff6a9b', 350, 1.5); NE.UI.toast(`${this.biome === 'core' ? 'ВЕРХОВНЫЙ ' : ''}АРХОНТ ПРОБУДИЛСЯ. Атакуйте способностями, уклоняйтесь от рывков.`, true); NE.Audio.play('hurt'); }
+  spawnBoss() { if (this.boss && !this.boss.dead) return; this.boss = NE.Entities.boss(this); if (this.biome === 'core') { this.boss.hp *= 1.35; this.boss.maxHp = this.boss.hp; this.boss.empowered = true; } this.announce(this.boss.empowered ? 'ВЕРХОВНЫЙ АРХОНТ' : 'АРХОНТ ПРОБУДИЛСЯ', 'АТАКУЙТЕ СПОСОБНОСТЯМИ · УХОДИТЕ ИЗ КОРИДОРА РЫВКА', '#ff719f'); this.ring(this.boss.x, this.boss.y, '#ff6a9b', 350, 1.5); NE.UI.toast(`${this.biome === 'core' ? 'ВЕРХОВНЫЙ ' : ''}АРХОНТ ПРОБУДИЛСЯ. Атакуйте способностями, уклоняйтесь от рывков.`, true); NE.Audio.play('hurt'); }
   currentAt(x, y) { return this.biome === 'current' ? { x: Math.sin(y / 260 + this.time * .12) * 25, y: Math.cos(x / 380 - this.time * .1) * 18 } : { x: 0, y: 0 }; }
   terrainActive(zone) { return (this.time + zone.offset) % 9 >= 2.3; }
-  updateTerrain() { for (const zone of this.terrain) if (this.terrainActive(zone) && NE.distance(this.player, zone) < zone.r && this.player.phase <= 0) this.hurt(this.biome === 'core' ? 17 : 13); }
+  updateTerrain() { for (const zone of this.terrain) if (this.terrainActive(zone) && NE.distance(this.player, zone) < zone.r && this.player.phase <= 0) this.hurt(this.biome === 'core' ? 17 : 13, { kind: 'field' }); }
+  announce(title, detail, color) { this.announcement = { title, detail, color, life: 3.4 }; }
   projectile(x, y, angle, speed, damage) { if (this.projectiles.length >= NE.C.projectileCap) return; this.projectiles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, r: 5, damage, life: 6, dead: false }); }
   wave(x, y, radius, damage) { if (this.waves.length < 6) this.waves.push({ x, y, r: 0, maxR: radius, damage, hit: false }); }
   burst(x, y, color, count, target) {
@@ -158,6 +163,7 @@ NE.Game = class {
   ring(x, y, color, radius, life) { if (this.rings.length < 28) this.rings.push({ x, y, color, radius, life, maxLife: life }); }
   label(x, y, text, color = '#a6ffce') { if (this.labels.length < 24) this.labels.push({ x, y, text, color, life: 1.2 }); }
   updateEffects(dt) {
+    if (this.announcement) this.announcement.life = Math.max(0, this.announcement.life - dt);
     for (const particle of this.particles) { particle.life -= dt; if (particle.target && particle.life < particle.maxLife * .75) { particle.x += (particle.target.x - particle.x) * (1 - Math.exp(-10 * dt)); particle.y += (particle.target.y - particle.y) * (1 - Math.exp(-10 * dt)); } else { particle.x += particle.vx * dt; particle.y += particle.vy * dt; particle.vx *= Math.exp(-3 * dt); particle.vy *= Math.exp(-3 * dt); } }
     this.particles = this.particles.filter(p => p.life > 0); this.rings.forEach(r => r.life -= dt); this.rings = this.rings.filter(r => r.life > 0); this.labels.forEach(l => { l.life -= dt; l.y -= 22 * dt; }); this.labels = this.labels.filter(l => l.life > 0); this.shake = Math.max(0, this.shake - dt * 2);
   }

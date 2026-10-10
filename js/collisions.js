@@ -14,25 +14,28 @@ NE.Collisions = {
   },
   actors(game, dt) {
     const p = game.player;
+    if (p.dead || game.state === 'result') return;
     const searchRadius = Math.max(p.r + 200, p.vortex > 0 ? 210 * (1 + p.upgrades.vortex * .22) + 100 : 0);
     for (const e of game.grid.query(p.x, p.y, searchRadius)) {
       if (e.kind !== 'enemy' && e.kind !== 'boss') continue;
       const d = NE.distance(p, e), contact = p.r + e.r;
       if (p.vortex > 0) {
         const range = 210 * (1 + p.upgrades.vortex * .22);
-        if (d < range + e.r) { if (e.kind !== 'boss') { const pull = 160 * dt; e.x += (p.x - e.x) / Math.max(1, d) * pull; e.y += (p.y - e.y) / Math.max(1, d) * pull; } game.damageEnemy(e, (18 + p.mass * .075) * (1 + p.upgrades.vortex * .15) * game.damageMultiplier() * dt); }
+        if (d < range + e.r) { if (e.kind !== 'boss') { const pull = 160 * dt; e.x += (p.x - e.x) / Math.max(1, d) * pull; e.y += (p.y - e.y) / Math.max(1, d) * pull; } game.damageEnemy(e, (18 + p.mass * .075) * (1 + p.upgrades.vortex * .15) * game.damageMultiplier() * dt); if (game.state === 'result') return; }
       }
       if (e.dead || d > contact) continue;
       if (p.phase > 0) {
-        if (!p.phaseHits.has(e.id)) { p.phaseHits.add(e.id); game.damageEnemy(e, (26 + p.mass * .22) * game.damageMultiplier()); game.burst(e.x, e.y, '#4ce6e0', 13); }
+        if (!p.phaseHits.has(e.id)) { p.phaseHits.add(e.id); game.damageEnemy(e, (26 + p.mass * .22) * game.damageMultiplier()); game.burst(e.x, e.y, '#4ce6e0', 13); if (game.state === 'result') return; }
       }
       if (e.dead) continue;
       if (e.kind === 'enemy' && p.mass >= e.mass * 1.18) { game.absorb(e); continue; }
       if (p.phase <= 0) {
-        if (e.kind === 'boss') game.hurt(24 + (e.state === 'charge' ? 15 : 0));
-        else game.hurt(10 + Math.min(30, e.mass / p.mass * 8));
+        if (e.kind === 'boss') game.hurt(24 + (e.state === 'charge' ? 15 : 0), { kind: 'boss' });
+        else game.hurt(10 + Math.min(30, e.mass / p.mass * 8), { kind: 'enemy', type: e.type });
       }
+      if (game.state === 'result') return;
       game.damageEnemy(e, (12 + p.mass * .055) * game.damageMultiplier() * dt);
+      if (game.state === 'result') return;
       if (e.kind !== 'boss' && p.phase <= 0) { const push = (contact - d + 1) * .15; e.x += (e.x - p.x) / Math.max(1, d) * push; e.y += (e.y - p.y) / Math.max(1, d) * push; }
     }
     // Only neighboring pairs interact; each pair is handled once.
@@ -46,10 +49,12 @@ NE.Collisions = {
     }
     for (const shot of game.projectiles) {
       if (shot.dead || NE.distance(p, shot) > p.r + shot.r) continue;
-      if (p.phase <= 0) game.hurt(shot.damage); shot.dead = true; game.burst(shot.x, shot.y, '#ff6a9b', 7);
+      if (p.phase <= 0) game.hurt(shot.damage, { kind: 'shot' }); shot.dead = true; game.burst(shot.x, shot.y, '#ff6a9b', 7);
+      if (game.state === 'result') return;
     }
     for (const wave of game.waves) {
-      if (!wave.hit && Math.abs(NE.distance(p, wave) - wave.r) < p.r + 12) { if (p.phase <= 0) game.hurt(wave.damage); wave.hit = true; }
+      if (!wave.hit && Math.abs(NE.distance(p, wave) - wave.r) < p.r + 12) { if (p.phase <= 0) game.hurt(wave.damage, { kind: 'wave' }); wave.hit = true; }
+      if (game.state === 'result') return;
     }
   }
 };

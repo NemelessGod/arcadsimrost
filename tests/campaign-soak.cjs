@@ -1,6 +1,8 @@
 'use strict';
 // Runs ordinary gameplay with automated inputs, without assigning health, mass, XP or mission counters.
 const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const path = require('node:path');
 const { chromium } = require('playwright');
 
 (async () => {
@@ -8,6 +10,7 @@ const { chromium } = require('playwright');
   const page = await browser.newPage(); const errors = [], report = [];
   page.on('pageerror', e => errors.push(e.message));
   try {
+    if (process.env.NE_TEST_CAPTURE) await fs.mkdir(process.env.NE_TEST_CAPTURE, { recursive: true });
     await page.addInitScript(() => {
       let seed = 41027;
       Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
@@ -70,6 +73,13 @@ const { chromium } = require('playwright');
           for (let i = 0; i < 1500 && NE.game.state !== 'result'; i++) advanceBot();
           const g = NE.game; return { sector: g.sector.name, state: g.state, win: !!g.win, seconds: Math.round(g.time), level: g.player.level, mass: Math.round(g.player.mass), hp: Math.round(g.player.hp), score: Math.floor(g.score), ...g.stats, stars: g.settlement?.stars || 0, bossPhase: g.boss?.phase || 0 };
         });
+        if (process.env.NE_TEST_CAPTURE && ((id === 1 && chunk === 0) || (id === 5 && chunk === 1))) {
+          await page.setViewportSize({ width: 1440, height: 960 });
+          await page.waitForTimeout(150);
+          await page.evaluate(() => { while (NE.game.state === 'upgrade') advanceBot(); NE.renderer.resize(); NE.UI.updateHUD(NE.game); for (let i = 0; i < 18; i++) NE.renderer.world(NE.game, .1); });
+          await page.waitForTimeout(4000);
+          await page.screenshot({ path: path.join(process.env.NE_TEST_CAPTURE, id === 1 ? 'reef.png' : 'archon.png') });
+        }
         if (status.state === 'result') break;
       }
       console.log(JSON.stringify(status)); report.push(status);

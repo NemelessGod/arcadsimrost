@@ -3,7 +3,7 @@ NE.Save = (() => {
   const KEY = 'neon-evolution.save', VERSION = 3;
   const defaults = () => ({
     version: VERSION,
-    settings: { volume: .45, sound: true, quality: 'high', shake: true, touch: false },
+    settings: { volume: .45, sound: true, quality: 'high', shake: true, touch: false, theme: 'lagoon', glow: .7, contrast: false, motion: !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) },
     forms: [0], selectedForm: 0, achievements: [], records: { survival: [], endless: [], campaign: [] }, runs: 0,
     profile: { xp: 0, crystals: 0, rating: 0, wins: 0, food: 0, kills: 0, bosses: 0, events: 0, bestMass: 18, bestLevel: 1 },
     cosmetics: { owned: ['mint'], selected: 'mint' },
@@ -20,7 +20,9 @@ NE.Save = (() => {
     const result = defaults(), s = raw.settings;
     if (s && typeof s === 'object') {
       if (Number.isFinite(s.volume)) result.settings.volume = NE.clamp(s.volume, 0, 1);
-      for (const name of ['sound', 'shake', 'touch']) if (typeof s[name] === 'boolean') result.settings[name] = s[name];
+      for (const name of ['sound', 'shake', 'touch', 'contrast', 'motion']) if (typeof s[name] === 'boolean') result.settings[name] = s[name];
+      if (['lagoon', 'ultraviolet', 'solar'].includes(s.theme)) result.settings.theme = s.theme;
+      if (Number.isFinite(s.glow)) result.settings.glow = NE.clamp(s.glow, 0, 1);
       if (['low', 'medium', 'high'].includes(s.quality)) result.settings.quality = s.quality;
     }
     result.forms = [...new Set([0, ...unique(raw.forms, [0, 1, 2, 3, 4])])];
