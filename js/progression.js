@@ -29,7 +29,7 @@ NE.Progress = (() => {
   }
   function isSectorUnlocked(id) {
     if (!Number.isInteger(id) || id < 0 || id >= NE.sectors.length) return false;
-    return id === 0 || NE.Save.data.campaign.stars.slice(0, id).every(n => n > 0);
+    return id === 0 || NE.Save.data.expedition.stars.slice(0, id).every(n => n > 0);
   }
   function paint(id = NE.Save.data.cosmetics.selected) { return NE.paints.find(p => p.id === id) || NE.paints[0]; }
   function color(player) { return paint(player.paint).color || NE.forms[player.stage].color; }
@@ -46,7 +46,7 @@ NE.Progress = (() => {
   function unlockPaint(id) { if (id && !NE.Save.data.cosmetics.owned.includes(id)) NE.Save.data.cosmetics.owned.push(id); }
   function milestones() {
     const data = NE.Save.data;
-    const rules = [['expedition', data.campaign.stars.every(n => n > 0)], ['collector', data.cosmetics.owned.length >= 6], ['goldLeague', data.profile.rating >= 1400]];
+    const rules = [['expedition', data.expedition.stars.every(n => n > 0)], ['collector', data.cosmetics.owned.length >= 6], ['goldLeague', data.profile.rating >= 1400]];
     for (const [id, earned] of rules) if (earned && !data.achievements.includes(id)) { data.achievements.push(id); NE.UI?.toast(`Достижение · ${NE.achievements.find(a => a.id === id).name}`); }
   }
   function claimPath(step) {
@@ -69,16 +69,14 @@ NE.Progress = (() => {
   }
   function campaignProgress(game) {
     if (!game.sector) return { complete: false, fraction: 0, label: '' };
-    const goals = game.sector.goals.map(goal => {
-      const value = ['level', 'mass'].includes(goal.key) ? game.player[goal.key] : goal.key === 'time' ? game.time : game.stats[goal.key];
-      return { ...goal, value: Math.min(goal.target, value) };
-    });
-    return {
-      complete: goals.every(g => g.value >= g.target),
-      fraction: goals.reduce((sum, g) => sum + g.value / g.target, 0) / goals.length,
-      label: goals.map(g => `${g.label} ${g.key === 'time' ? NE.time(g.value) + '/' + NE.time(g.target) : Math.floor(g.value) + '/' + g.target}`).join(' · ')
-    };
+    return game.mission ? game.mission.progress() : { complete: false, fraction: 0, label: '' };
   }
+  function buyPermanent(id) {
+    const e = NE.Save.data.expedition, gene = NE.permanentGenes.find(g => g.id === id), rank = e.upgrades[id];
+    if (!gene || !Number.isInteger(rank) || rank >= 3 || e.samples < [3, 5, 8][rank]) return false;
+    e.samples -= [3, 5, 8][rank]; e.upgrades[id]++; NE.Save.persist(); NE.Audio?.play('achievement'); return true;
+  }
+
   function settle(game, win) {
     if (game.settlement) return game.settlement;
     const data = NE.Save.data, stats = game.stats, p = game.player;
@@ -87,24 +85,26 @@ NE.Progress = (() => {
     let crystals = Math.floor(xp * .32), rating = eligible ? Math.min(180, Math.floor(game.time / 20) + p.level * 2 + stats.kills * 2 + stats.events * 10 + stats.bosses * 40 + (win ? 20 : 0)) : 0;
     let stars = 0, firstClear = false;
     if (game.sector && win) {
-      const sector = game.sector, previous = data.campaign.stars[sector.id];
+      const sector = game.sector, previous = data.expedition.stars[sector.id];
       stars = 1 + ((game.finishHealthRatio ?? p.hp / p.maxHp) >= .5 ? 1 : 0) + (game.score >= sector.starScore ? 1 : 0);
       firstClear = previous === 0;
       crystals += (firstClear ? sector.prize : 0) + Math.max(0, stars - previous) * 25;
       xp += firstClear ? 100 + sector.id * 25 : 0;
-      data.campaign.stars[sector.id] = Math.max(previous, stars);
-      data.campaign.bestScores[sector.id] = Math.max(data.campaign.bestScores[sector.id], Math.floor(game.score));
-      data.campaign.selected = Math.min(5, sector.id + 1);
+      data.expedition.stars[sector.id] = Math.max(previous, stars);
+      data.expedition.bestScores[sector.id] = Math.max(data.expedition.bestScores[sector.id], Math.floor(game.score));
+      data.expedition.selected = Math.min(4, sector.id + 1);
     }
+    const samples = game.mission && win ? (firstClear ? game.sector.samples : game.sector.repeatSamples) : 0;
+    data.expedition.samples = Math.min(1e6, data.expedition.samples + samples); data.expedition.earned = Math.min(1e6, data.expedition.earned + samples);
     const today = ensureDaily(dayKey(), false);
     for (const key of ['food', 'kills', 'abilities', 'events', 'bosses']) today[key] = Math.min(1e8, today[key] + stats[key]);
     today.time = Math.min(1e8, today.time + Math.floor(game.time));
     data.profile.xp = Math.min(1e8, data.profile.xp + xp); data.profile.crystals = Math.min(1e8, data.profile.crystals + crystals); data.profile.rating = Math.min(1e8, data.profile.rating + rating);
     for (const key of ['food', 'kills', 'events', 'bosses']) data.profile[key] = Math.min(1e8, data.profile[key] + stats[key]);
     data.profile.wins = Math.min(1e8, data.profile.wins + (win ? 1 : 0)); data.profile.bestMass = Math.max(data.profile.bestMass, Math.floor(p.mass)); data.profile.bestLevel = Math.max(data.profile.bestLevel, p.level);
-    game.settlement = { xp, crystals, rating, stars, firstClear, eligible, previousLeague: before.name, league: league().name, promoted: before.index < league().index };
+    game.settlement = { samples, entries: game.mission?.found || [], xp, crystals, rating, stars, firstClear, eligible, previousLeague: before.name, league: league().name, promoted: before.index < league().index };
     milestones();
     return game.settlement;
   }
-  return { dayKey, ensureDaily, dailyList, profile, league, isSectorUnlocked, paint, color, equip, buy, claimPath, claimLeague, claimContract, campaignProgress, settle };
+  return { dayKey, ensureDaily, dailyList, profile, league, isSectorUnlocked, paint, color, equip, buy, claimPath, claimLeague, claimContract, campaignProgress, buyPermanent, settle };
 })();

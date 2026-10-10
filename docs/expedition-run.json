@@ -1,0 +1,395 @@
+[
+  {
+    "phases": [
+      {
+        "phase": "objectives",
+        "time": 29
+      },
+      {
+        "phase": "trial",
+        "time": 66
+      },
+      {
+        "phase": "exit",
+        "time": 113
+      }
+    ],
+    "sector": "Колыбель",
+    "state": "result",
+    "win": true,
+    "seconds": 126,
+    "level": 13,
+    "mass": 832,
+    "hp": 160,
+    "score": 51245,
+    "food": 225,
+    "kills": 36,
+    "abilities": 19,
+    "events": 1,
+    "bosses": 0,
+    "distance": 10613.217789117502,
+    "stars": 3,
+    "phase": "exit",
+    "objectives": [
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 6
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 6
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 6
+      }
+    ],
+    "x": 3097,
+    "y": 2074,
+    "bossHp": 0,
+    "lastHit": null,
+    "genes": {
+      "speed": 0,
+      "growth": 0,
+      "magnet": 0,
+      "capacity": 0,
+      "regen": 0,
+      "armor": 4,
+      "damage": 2,
+      "heal": 5,
+      "cooldown": 0,
+      "boost": 0,
+      "vitality": 0,
+      "xp": 0,
+      "pulse": 0,
+      "phase": 0,
+      "vortex": 1
+    },
+    "bossPhase": 0
+  },
+  {
+    "phases": [
+      {
+        "phase": "objectives",
+        "time": 43
+      },
+      {
+        "phase": "trial",
+        "time": 304
+      },
+      {
+        "phase": "exit",
+        "time": 340
+      }
+    ],
+    "sector": "Заражённый сад",
+    "state": "result",
+    "win": true,
+    "seconds": 349,
+    "level": 23,
+    "mass": 1600,
+    "hp": 160,
+    "score": 273590,
+    "food": 1006,
+    "kills": 65,
+    "abilities": 60,
+    "events": 4,
+    "bosses": 1,
+    "distance": 17888.07181904239,
+    "stars": 3,
+    "phase": "exit",
+    "objectives": [
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 40
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 40
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 40
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 40
+      }
+    ],
+    "x": 3078,
+    "y": 2054,
+    "bossHp": -1,
+    "lastHit": {
+      "kind": "boss",
+      "damage": 12,
+      "time": 339.4666666666866
+    },
+    "genes": {
+      "speed": 1,
+      "growth": 1,
+      "magnet": 2,
+      "capacity": 0,
+      "regen": 0,
+      "armor": 5,
+      "damage": 4,
+      "heal": 5,
+      "cooldown": 0,
+      "boost": 0,
+      "vitality": 0,
+      "xp": 2,
+      "pulse": 0,
+      "phase": 0,
+      "vortex": 2
+    },
+    "bossPhase": 3
+  },
+  {
+    "phases": [
+      {
+        "phase": "objectives",
+        "time": 56
+      },
+      {
+        "phase": "trial",
+        "time": 307
+      },
+      {
+        "phase": "exit",
+        "time": 379
+      }
+    ],
+    "sector": "Осколочный пояс",
+    "state": "result",
+    "win": true,
+    "seconds": 404,
+    "level": 23,
+    "mass": 1600,
+    "hp": 185,
+    "score": 356432,
+    "food": 828,
+    "kills": 68,
+    "abilities": 70,
+    "events": 4,
+    "bosses": 0,
+    "distance": 19616.060773840676,
+    "stars": 3,
+    "phase": "exit",
+    "objectives": [
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 18
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 18
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 18
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 18
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 18
+      }
+    ],
+    "x": 3077,
+    "y": 2054,
+    "bossHp": 0,
+    "lastHit": {
+      "kind": "enemy",
+      "type": 5,
+      "damage": 10,
+      "time": 392.5666666666383
+    },
+    "genes": {
+      "speed": 2,
+      "growth": 1,
+      "magnet": 2,
+      "capacity": 0,
+      "regen": 0,
+      "armor": 5,
+      "damage": 3,
+      "heal": 5,
+      "cooldown": 1,
+      "boost": 0,
+      "vitality": 1,
+      "xp": 0,
+      "pulse": 0,
+      "phase": 1,
+      "vortex": 1
+    },
+    "bossPhase": 0
+  },
+  {
+    "phases": [
+      {
+        "phase": "objectives",
+        "time": 74
+      },
+      {
+        "phase": "trial",
+        "time": 212
+      },
+      {
+        "phase": "exit",
+        "time": 369
+      }
+    ],
+    "sector": "Затопленный реактор",
+    "state": "result",
+    "win": true,
+    "seconds": 376,
+    "level": 25,
+    "mass": 1600,
+    "hp": 160,
+    "score": 683058,
+    "food": 1018,
+    "kills": 105,
+    "abilities": 83,
+    "events": 4,
+    "bosses": 0,
+    "distance": 27623.838775993456,
+    "stars": 3,
+    "phase": "exit",
+    "objectives": [
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 25
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 25
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 25
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 25
+      }
+    ],
+    "x": 3023,
+    "y": 2147,
+    "bossHp": 0,
+    "lastHit": {
+      "kind": "enemy",
+      "type": 3,
+      "damage": 10,
+      "time": 375.0333333333209
+    },
+    "genes": {
+      "speed": 5,
+      "growth": 3,
+      "magnet": 1,
+      "capacity": 0,
+      "regen": 0,
+      "armor": 5,
+      "damage": 2,
+      "heal": 5,
+      "cooldown": 2,
+      "boost": 0,
+      "vitality": 0,
+      "xp": 0,
+      "pulse": 1,
+      "phase": 0,
+      "vortex": 0
+    },
+    "bossPhase": 0
+  },
+  {
+    "phases": [
+      {
+        "phase": "objectives",
+        "time": 93
+      },
+      {
+        "phase": "trial",
+        "time": 274
+      },
+      {
+        "phase": "exit",
+        "time": 308
+      }
+    ],
+    "sector": "Ядро",
+    "state": "result",
+    "win": true,
+    "seconds": 340,
+    "level": 25,
+    "mass": 1600,
+    "hp": 160,
+    "score": 396961,
+    "food": 974,
+    "kills": 72,
+    "abilities": 64,
+    "events": 4,
+    "bosses": 1,
+    "distance": 23653.210510171648,
+    "stars": 2,
+    "phase": "exit",
+    "objectives": [
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 40
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 40
+      },
+      {
+        "done": true,
+        "hp": 0,
+        "charge": 40
+      }
+    ],
+    "x": 3050,
+    "y": 2081,
+    "bossHp": -711,
+    "lastHit": {
+      "kind": "wave",
+      "damage": 7,
+      "time": 306.6666666667164
+    },
+    "genes": {
+      "speed": 1,
+      "growth": 2,
+      "magnet": 0,
+      "capacity": 0,
+      "regen": 0,
+      "armor": 5,
+      "damage": 5,
+      "heal": 5,
+      "cooldown": 1,
+      "boost": 0,
+      "vitality": 0,
+      "xp": 4,
+      "pulse": 1,
+      "phase": 0,
+      "vortex": 0
+    },
+    "bossPhase": 3
+  }
+]

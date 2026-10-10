@@ -147,7 +147,7 @@ NE.Renderer = class {
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); this.background(game.biome, t);
     const shake = NE.Save.data.settings.motion && NE.Save.data.settings.shake && game.shake > 0 ? game.shake * 4 : 0;
     c.save(); c.translate(this.width / 2 + Math.sin(t * 83) * shake, this.height / 2 + Math.cos(t * 73) * shake); c.scale(cam.zoom, cam.zoom); c.translate(-cam.x, -cam.y);
-    this.drawGround(game);
+    this.drawGround(game); if (game.mission) this.drawMission(game);
     for (const e of game.enemies) if (this.visible(e)) this.trail(e, NE.species[e.type].color);
     this.trail(p, NE.Progress.color(p));
     for (const f of game.food) if (!f.dead && this.visible(f, 10)) {
@@ -158,6 +158,9 @@ NE.Renderer = class {
     }
     c.globalAlpha = 1; c.shadowBlur = 0;
     for (const e of game.enemies) if (!e.dead && this.visible(e)) {
+      if (e.attackState === 'windup') {
+        const angle = Math.atan2(e.aimY - e.y, e.aimX - e.x); c.save(); c.translate(e.x, e.y); c.rotate(angle); c.fillStyle = '#ff719f22'; c.fillRect(0, -e.r * .8, 260, e.r * 1.6); c.strokeStyle = '#ff719faa'; c.lineWidth = 2; c.setLineDash([8, 6]); c.strokeRect(0, -e.r * .8, 260, e.r * 1.6); c.restore();
+      }
       const relation = game.relation(e), col = NE.Visuals.relations[relation].color;
       this.organism(e, NE.Visuals.mix(NE.species[e.type].color, col, .28), t); this.drawRelation(e, relation, game);
       if (NE.distance(e, p) < 440) {
@@ -261,26 +264,51 @@ NE.Renderer = class {
       else { c.lineWidth = 1; this.circle(event.x, event.y, event.r, '#b9ff9e12'); this.circle(event.x, event.y, event.r, '#b9ff9e44', true); c.fillStyle = '#b9ff9e66'; c.font = '10px monospace'; c.textAlign = 'center'; c.fillText(event.type === 'bloom' ? 'ЭНЕРГЕТИЧЕСКИЙ РАСЦВЕТ' : 'МИГРАЦИЯ', event.x, event.y - event.r - 16); }
     }
   }
+  drawMission(game) {
+    const m = game.mission, c = this.ctx, color = game.sector.color;
+    for (const o of m.obstacles) if (this.visible(o, o.r)) {
+      c.save(); c.translate(o.x, o.y); c.rotate(o.seed * .7); c.fillStyle = game.biome === 'reef' ? '#143223' : '#182b36'; c.strokeStyle = color + '99'; c.lineWidth = 3;
+      c.beginPath(); for (let i = 0; i <= 7; i++) { const a = i / 7 * Math.PI * 2; if (!i) c.moveTo(Math.cos(a) * o.r, Math.sin(a) * o.r); else c.lineTo(Math.cos(a) * o.r, Math.sin(a) * o.r); } c.fill(); c.stroke();
+      c.strokeStyle = color + '33'; c.lineWidth = 1; c.beginPath(); c.moveTo(-o.r * .6, -o.r * .3); c.lineTo(o.r * .3, o.r * .5); c.lineTo(o.r * .65, -o.r * .5); c.stroke(); c.restore();
+    }
+    for (const z of m.hazards) if ((!z.nest || !z.nest.dead) && this.visible(z, z.r)) {
+      const active = m.hazardActive(z), warning = m.hazardWarning(z), col = z.nest ? '#c0ff87' : '#ff719f';
+      this.circle(z.x, z.y, z.r, col + (active ? '1c' : warning ? '14' : '06')); c.lineWidth = warning ? 3 : 1; c.setLineDash(active ? [] : [7, 8]); this.circle(z.x, z.y, z.r, col + (active ? '99' : warning ? 'cc' : '50'), true); c.setLineDash([]);
+      c.textAlign = 'center'; c.font = '11px monospace'; c.fillStyle = col; c.fillText(z.nest ? 'СПОРЫ · СКОРОСТЬ −35%' : active ? '▲ РАЗРЯД' : warning ? '▲ РАЗРЯД СКОРО' : '◇ БЕЗОПАСНОЕ ОКНО', z.x, z.y - z.r - 12);
+    }
+    for (const o of [...m.objects, ...(m.defense ? [m.defense] : []), m.exit]) if (this.visible(o, o.r + 90)) {
+      const active = o.kind === 'exit' ? m.phase === 'exit' : !o.dead && (o.active || o.kind === 'defense'), col = active ? o.hp > 0 && o.kind === 'target' ? '#ff719f' : color : '#4d6b71';
+      c.save(); c.translate(o.x, o.y); this.glow(col, active ? 16 : 0); c.lineWidth = 2; this.circle(0, 0, o.r + 24, col + '99', true); this.circle(0, 0, o.r, col + '18');
+      c.strokeStyle = col; c.beginPath(); const a = game.time * .3; for (let i = 0; i <= 4; i++) { const angle = i / 4 * Math.PI * 2 + (o.kind === 'exit' ? Math.PI / 4 : a); if (!i) c.moveTo(Math.cos(angle) * o.r * .7, Math.sin(angle) * o.r * .7); else c.lineTo(Math.cos(angle) * o.r * .7, Math.sin(angle) * o.r * .7); } c.stroke(); c.shadowBlur = 0;
+      const fraction = o.kind === 'defense' ? o.progress / o.duration : o.charge ? o.charge / o.duration : 0;
+      c.beginPath(); c.arc(0, 0, o.r + 29, -Math.PI / 2, -Math.PI / 2 + fraction * Math.PI * 2); c.lineWidth = 5; c.stroke();
+      c.font = 'bold ' + Math.min(22, 11 / this.camera.zoom) + 'px monospace'; c.textAlign = 'center'; c.fillStyle = col; c.fillText(o.dead ? '✓ ВОССТАНОВЛЕНО' : o.kind === 'exit' ? active ? 'ВЫХОД ОТКРЫТ' : 'ВЫХОД ЗАКРЫТ' : o.name, 0, -o.r - 40);
+      if (o.maxHp > 0 && !o.dead) { c.fillStyle = '#27353c'; c.fillRect(-35, o.r + 40, 70, 5); c.fillStyle = col; c.fillRect(-35, o.r + 40, 70 * o.hp / o.maxHp, 5); }
+      c.restore();
+    }
+  }
   drawBoss(b, game) {
     const c = this.ctx; c.save();
+    if (b.state === 'ringwarn') { this.circle(b.x, b.y, b.r + 50, '#ffe19a99', true); c.strokeStyle = '#ffe19a66'; c.lineWidth = 2; for (let i = 0; i < 10 + b.phase * 3; i++) { const a = i / (10 + b.phase * 3) * Math.PI * 2 + b.attackCount * .23; c.beginPath(); c.moveTo(b.x + Math.cos(a) * b.r, b.y + Math.sin(a) * b.r); c.lineTo(b.x + Math.cos(a) * (b.r + 110), b.y + Math.sin(a) * (b.r + 110)); c.stroke(); } }
     if (b.state === 'telegraph') {
       const a = Math.atan2(b.targetY - b.y, b.targetX - b.x); c.translate(b.x, b.y); c.rotate(a); c.fillStyle = '#ff6a9b18'; c.fillRect(0, -b.r, 500, b.r * 2); c.strokeStyle = '#ff6a9baa'; c.setLineDash([12, 8]); c.lineWidth = 2; c.strokeRect(0, -b.r, 500, b.r * 2); c.setLineDash([]); c.restore(); c.save();
     }
+    if (b.shielded) { c.lineWidth = 4; this.circle(b.x, b.y, b.r * 1.6, '#88ffe199', true); c.font = '11px monospace'; c.textAlign = 'center'; c.fillStyle = '#88ffe1'; c.fillText('ЩИТ ПЕРЕСТРАИВАЕТСЯ · УКЛОНЯЙТЕСЬ', b.x, b.y + b.r * 1.8); }
     this.organism({ ...b, type: 4, angle: b.angle + game.time * .1 }, b.flash > 0 ? '#fff2f8' : '#ff6a9b', game.time);
     const phaseColor = ['#ff719f', '#ffac87', '#ffe09b'][b.phase - 1], time = NE.Save.data.settings.motion ? game.time : 0;
     c.translate(b.x, b.y); c.rotate(-time * .4); this.glow(phaseColor, 12); c.strokeStyle = phaseColor + 'b0'; c.fillStyle = phaseColor + '22'; c.lineWidth = 2;
     for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; c.beginPath(); c.arc(0, 0, b.r * 1.38, a, a + .55); c.stroke(); c.save(); c.rotate(a + .25); c.beginPath(); c.moveTo(b.r * 1.16, -7); c.lineTo(b.r * (1.52 + b.phase * .08), 0); c.lineTo(b.r * 1.16, 7); c.closePath(); c.fill(); c.stroke(); c.restore(); }
     c.shadowBlur = 0; this.circle(0, 0, b.r * .19, '#331128'); this.circle(0, 0, b.r * .12, phaseColor); c.restore();
-    c.fillStyle = phaseColor; c.font = 'bold ' + Math.min(24, 11 / this.camera.zoom) + 'px monospace'; c.textAlign = 'center'; c.fillText((b.empowered ? 'ВЕРХОВНЫЙ АРХОНТ' : 'АРХОНТ') + ' · ' + ['I', 'II', 'III'][b.phase - 1], b.x, b.y - b.r * 1.75); c.shadowBlur = 0;
+    c.fillStyle = phaseColor; c.font = 'bold ' + Math.min(24, 11 / this.camera.zoom) + 'px monospace'; c.textAlign = 'center'; c.fillText((b.name || (b.empowered ? 'ВЕРХОВНЫЙ АРХОНТ' : 'АРХОНТ')) + ' · ' + ['I', 'II', 'III'][b.phase - 1], b.x, b.y - b.r * 1.75); c.shadowBlur = 0;
   }
   drawArrow(game) {
-    const c = this.ctx, target = game.boss && !game.boss.dead ? game.boss : game.event && game.event.type !== 'storm' ? game.event : null;
+    const c = this.ctx, target = game.mission?.nearest() || (game.boss && !game.boss.dead ? game.boss : game.event && game.event.type !== 'storm' ? game.event : null);
     if (!target) return;
     const dx = (target.x - this.camera.x) * this.camera.zoom, dy = (target.y - this.camera.y) * this.camera.zoom;
     if (Math.abs(dx) < this.width * .44 && Math.abs(dy) < this.height * .4) return;
     const a = Math.atan2(dy, dx), padding = this.width < 600 ? 50 : 100, scale = Math.min((this.width / 2 - padding) / Math.max(1, Math.abs(dx)), (this.height / 2 - 90) / Math.max(1, Math.abs(dy)));
     const x = this.width / 2 + dx * scale, y = this.height / 2 + dy * scale;
-    c.save(); c.translate(x, y); c.rotate(a); c.fillStyle = target.kind === 'boss' ? '#ff6a9b' : '#a6ffce'; c.beginPath(); c.moveTo(9, 0); c.lineTo(-6, -5); c.lineTo(-6, 5); c.closePath(); c.fill(); c.restore(); c.textAlign = 'center'; c.font = '9px monospace'; c.fillStyle = target.kind === 'boss' ? '#ff6a9b' : '#a6ffce'; c.fillText(target.kind === 'boss' ? 'АРХОНТ' : 'СОБЫТИЕ', x, y + 19);
+    c.save(); c.translate(x, y); c.rotate(a); c.fillStyle = target.kind === 'boss' ? '#ff6a9b' : '#a6ffce'; c.beginPath(); c.moveTo(9, 0); c.lineTo(-6, -5); c.lineTo(-6, 5); c.closePath(); c.fill(); c.restore(); c.textAlign = 'center'; c.font = '9px monospace'; c.fillStyle = target.kind === 'boss' ? '#ff6a9b' : '#a6ffce'; c.fillText(target.name || (target.kind === 'boss' ? 'АРХОНТ' : 'СОБЫТИЕ'), x, y + 19);
   }
   minimap(game) {
     const canvas = document.getElementById('minimap'), c = canvas.getContext('2d'), w = canvas.width, h = canvas.height, sx = w / NE.C.width, sy = h / NE.C.height;
@@ -290,6 +318,10 @@ NE.Renderer = class {
     for (const e of game.enemies) { const relation = game.relation(e); c.fillStyle = NE.Visuals.relations[relation].color; if (relation === 'danger') { const x = e.x * sx, y = e.y * sy; c.beginPath(); c.moveTo(x, y - 2); c.lineTo(x - 2, y + 2); c.lineTo(x + 2, y + 2); c.closePath(); c.fill(); } else c.fillRect(e.x * sx, e.y * sy, 2, 2); }
     for (const z of game.terrain) { c.strokeStyle = game.terrainActive(z) ? '#ff6a9b66' : '#dfb7ff44'; c.beginPath(); c.arc(z.x * sx, z.y * sy, z.r * sx, 0, Math.PI * 2); c.stroke(); }
     if (game.boss && !game.boss.dead) { c.fillStyle = '#ff6a9b'; c.fillRect(game.boss.x * sx - 3, game.boss.y * sy - 3, 6, 6); }
+    if (game.mission) {
+      for (const o of game.mission.obstacles) { c.fillStyle = '#607e8866'; c.beginPath(); c.arc(o.x * sx, o.y * sy, o.r * sx, 0, Math.PI * 2); c.fill(); }
+      for (const o of [...game.mission.objects, ...(game.mission.defense ? [game.mission.defense] : []), game.mission.exit]) { c.fillStyle = o.dead ? '#466965' : o.kind === 'exit' && game.mission.phase !== 'exit' ? '#425463' : o.kind === 'target' && o.hp > 0 ? '#ff719f' : '#88ffe1'; c.fillRect(o.x * sx - 2, o.y * sy - 2, 5, 5); }
+    }
     const p = game.player; c.strokeStyle = '#a6ffce33'; c.strokeRect((p.x - this.width / this.camera.zoom / 2) * sx, (p.y - this.height / this.camera.zoom / 2) * sy, this.width / this.camera.zoom * sx, this.height / this.camera.zoom * sy); c.fillStyle = '#c7ffdc'; c.beginPath(); c.arc(p.x * sx, p.y * sy, 3, 0, Math.PI * 2); c.fill();
   }
 };

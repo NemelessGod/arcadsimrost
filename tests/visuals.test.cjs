@@ -42,10 +42,10 @@ async function check(name, run) { await run(); console.log(`PASS ${++count} · $
     });
     await check('All sectors render in every palette and quality; texture cache remains bounded', async () => {
       const results = await page.evaluate(() => {
-        NE.Save.data.campaign.stars = [1, 1, 1, 1, 1, 1]; const hashes = [], r = NE.renderer;
+        NE.Save.data.expedition.stars = [1, 1, 1, 1, 1]; const hashes = [], r = NE.renderer;
         for (const quality of ['low', 'medium', 'high']) for (const theme of Object.keys(NE.Visuals.themes)) {
           NE.Save.setting('quality', quality); NE.Save.setting('theme', theme); NE.Visuals.apply(); r.resize();
-          for (let id = 0; id < 6; id++) {
+          for (let id = 0; id < 5; id++) {
             NE.UI.start(false, { mode: 'campaign', sectorId: id }); const g = NE.game; g.state = 'paused';
             r.world(g, 1 / 60); const c = r.ctx.getImageData(500, 300, 1, 1).data; hashes.push([...c].join(','));
             if (NE.Visuals.cacheSize > 3 || NE.Visuals.texture(g.biome).width !== (quality === 'low' ? 256 : 512)) return [];
@@ -53,7 +53,7 @@ async function check(name, run) { await run(); console.log(`PASS ${++count} · $
         }
         NE.UI.mainMenu(); return hashes;
       });
-      assert.equal(results.length, 54); assert.ok(new Set(results).size > 10);
+      assert.equal(results.length, 45); assert.ok(new Set(results).size > 10);
     });
     await check('Field atlas displays six distinct procedural species and three abilities', async () => {
       await page.click('[data-action=codex]'); assert.equal(await page.locator('.codex-card').count(), 6); assert.equal(await page.locator('.codex-abilities>div').count(), 3);

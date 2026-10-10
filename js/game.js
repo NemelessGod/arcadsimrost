@@ -1,13 +1,13 @@
 'use strict';
 NE.Game = class {
   constructor(mode = 'survival', tutorial = false, options = {}) {
-    this.mode = mode; this.sector = mode === 'campaign' ? NE.sectors[NE.clamp(Math.floor(options.sectorId ?? NE.Save.data.campaign.selected), 0, 5)] : null;
+    this.mode = mode; this.sector = mode === 'campaign' ? NE.sectors[NE.clamp(Math.floor(options.sectorId ?? NE.Save.data.expedition.selected), 0, 4)] : null;
     this.biome = this.sector?.biome || 'wild'; this.terrain = [];
     this.tutorial = tutorial; this.state = 'running'; this.time = 0; this.score = 0; this.player = NE.Entities.player(NE.Save.data.selectedForm);
     this.player.paint = NE.Save.data.cosmetics.selected;
     this.food = []; this.enemies = []; this.particles = []; this.rings = []; this.labels = []; this.projectiles = []; this.waves = []; this.boss = null; this.grid = new NE.Grid();
     this.stats = { food: 0, kills: 0, abilities: 0, events: 0, bosses: 0, distance: 0 }; this.pendingUpgrades = 0; this.offered = [];
-    this.spawnTimer = 0; this.trailTimer = 0; this.shake = 0; this.event = null; this.eventIndex = this.biome === 'storm' ? 2 : 0; this.nextEvent = this.biome === 'storm' ? 12 : 40; this.nextBoss = this.sector ? (this.sector.bossTime ?? Infinity) : NE.C.bossTime; this.questIndex = 0; this.tutorialStep = 0;
+    this.spawnTimer = 0; this.trailTimer = 0; this.shake = 0; this.event = null; this.eventIndex = this.biome === 'storm' ? 2 : 0; this.nextEvent = this.biome === 'storm' ? 12 : 40; this.nextBoss = this.sector ? Infinity : NE.C.bossTime; this.questIndex = 0; this.tutorialStep = 0;
     this.announcement = null; this.lastHit = null;
     this.quests = [
       { text: 'Соберите 20 частиц энергии', key: 'food', goal: 20, xp: 36, mass: 6 },
@@ -21,27 +21,28 @@ NE.Game = class {
     for (let i = 0; i < (this.biome === 'abyss' ? 260 : 320); i++) this.food.push(NE.Entities.food(undefined, undefined, this.biome === 'reef' && i % 7 === 0));
     // A rich, safe starting patch makes the initial growth responsive.
     for (let i = 0; i < 55; i++) { const angle = i * 2.4, r = 30 + Math.sqrt(i) * 25; this.food.push(NE.Entities.food(this.player.x + Math.cos(angle) * r, this.player.y + Math.sin(angle) * r)); }
-    for (let i = 0; i < (this.sector?.population ?? 54); i++) this.spawnEnemy(i % 6);
+    for (let i = 0; i < (this.sector?.population ?? 54); i++) this.spawnEnemy(this.sector?.id === 0 ? i % 3 : i % 6);
     for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; this.spawnEnemy(0, this.player.x + Math.cos(a) * 260, this.player.y + Math.sin(a) * 260, 8 + i); }
     this.grid.rebuild(this.food, this.enemies, [this.player]); this.player.invulnerable = tutorial ? 12 : 3;
     if (['storm', 'core'].includes(this.biome)) for (let i = 0; i < (this.biome === 'core' ? 8 : 6); i++) this.terrain.push({ x: 500 + i % 3 * 1050, y: 450 + Math.floor(i / 3) * 780, r: this.biome === 'core' ? 115 : 145, offset: i * 1.2 });
+    this.mission = this.sector ? new NE.Expedition(this) : null;
   }
   relation(e) { return this.player.mass >= e.mass * 1.18 ? 'edible' : e.mass >= this.player.mass * 1.18 ? 'danger' : 'equal'; }
-  damageMultiplier() { return 1 + this.player.upgrades.damage * .18 + (this.player.skin === 2 ? .08 : 0); }
-  growthMultiplier() { return 1 + this.player.upgrades.growth * .18 + (this.player.skin === 4 ? .1 : 0); }
-  speed() { const p = this.player; return 190 / (1 + Math.sqrt(p.mass) / 30) * (1 + p.upgrades.speed * .08 + (p.skin === 1 ? .08 : 0)); }
+  damageMultiplier() { return 1 + (this.mission ? NE.Save.data.expedition.upgrades.attack * .05 : 0) + this.player.upgrades.damage * .18 + (this.player.skin === 2 ? .08 : 0); }
+  growthMultiplier() { return 1 + (this.mission ? NE.Save.data.expedition.upgrades.harvest * .03 : 0) + this.player.upgrades.growth * .18 + (this.player.skin === 4 ? .1 : 0); }
+  speed() { const p = this.player; return 190 * (this.mission ? (1 + NE.Save.data.expedition.upgrades.speed * .035) * (p.phase > 0 ? 1 : this.mission.slowAt(p)) : 1) / (1 + Math.sqrt(p.mass) / 30) * (1 + p.upgrades.speed * .08 + (p.skin === 1 ? .08 : 0)); }
   spawnEnemy(type, x, y, mass) {
     if (this.enemies.filter(e => !e.dead).length >= NE.C.enemyCap) return null;
     const e = NE.Entities.enemy(type, x, y, mass);
     if (this.sector && mass === undefined) { e.mass = NE.clamp(e.mass * this.sector.difficulty, 5, 650); e.r = NE.radius(e.mass); e.hp = e.maxHp = 20 + e.mass * .65; }
     if (x === undefined && NE.distance(e, this.player) < 440) { const a = NE.rand(0, Math.PI * 2); e.x = NE.clamp(this.player.x + Math.cos(a) * 620, e.r, NE.C.width - e.r); e.y = NE.clamp(this.player.y + Math.sin(a) * 620, e.r, NE.C.height - e.r); }
-    e.anchor = { x: e.x, y: e.y }; this.enemies.push(e); return e;
+    this.mission?.resolve(e); e.anchor = { x: e.x, y: e.y }; this.enemies.push(e); return e;
   }
-  addMass(amount) { this.player.mass = Math.min(5000, this.player.mass + amount * this.growthMultiplier()); }
+  addMass(amount) { this.player.mass = Math.min(this.mission ? 1600 : 5000, this.player.mass + amount * this.growthMultiplier() / (this.mission ? 1 + Math.max(0, this.player.mass - 220) / 500 : 1)); }
   addXP(amount) {
-    const p = this.player; if (p.level >= 50) { this.score += amount * 3; return; }
-    p.xp += amount * (1 + p.upgrades.xp * .15);
-    while (p.xp >= p.xpNext && p.level < 50) { p.xp -= p.xpNext; p.level++; p.xpNext = 24 + p.level * 18; this.pendingUpgrades++; this.checkEvolution(); }
+    const p = this.player; if (p.level >= (this.mission ? 25 : 50)) { this.score += amount * 3; return; }
+    p.xp += amount * (this.mission ? .65 * (1 + NE.Save.data.expedition.upgrades.harvest * .03) : 1) * (1 + p.upgrades.xp * .15);
+    while (p.xp >= p.xpNext && p.level < (this.mission ? 25 : 50)) { p.xp -= p.xpNext; p.level++; p.xpNext = 24 + p.level * 18; this.pendingUpgrades++; this.checkEvolution(); }
     if (this.pendingUpgrades && this.state === 'running') NE.UI.showUpgrade(this);
   }
   checkEvolution() {
@@ -73,7 +74,7 @@ NE.Game = class {
     this.stats.kills++; this.score += Math.ceil(e.mass * 11); this.addMass(Math.min(NE.C.preyMassCap, e.mass * .22));
     p.energy = Math.min(p.maxEnergy, p.energy + 15); p.hp = Math.min(p.maxHp, p.hp + 5);
     if (e.migration && this.event?.type === 'migration') this.event.progress++;
-    this.burst(e.x, e.y, NE.species[e.type].color, 18, p); this.ring(e.x, e.y, '#a6ffce', e.r * 2.5, .4); this.label(e.x, e.y, '+' + Math.round(xp * (1 + p.upgrades.xp * .15)) + ' XP'); NE.Audio.play('absorb');
+    this.burst(e.x, e.y, NE.species[e.type].color, 18, p); this.ring(e.x, e.y, '#a6ffce', e.r * 2.5, .4); this.label(e.x, e.y, '+' + Math.round(xp * (this.mission ? .65 * (1 + NE.Save.data.expedition.upgrades.harvest * .03) : 1) * (1 + p.upgrades.xp * .15)) + ' XP'); NE.Audio.play('absorb');
     NE.Save.achievement('predator'); if (this.stats.kills >= 25) NE.Save.achievement('hunter'); this.addXP(xp);
   }
   hurt(amount, source = { kind: 'unknown' }) {
@@ -84,13 +85,16 @@ NE.Game = class {
     if (p.hp <= 0) { p.dead = true; this.burst(p.x, p.y, NE.forms[p.stage].color, 65); this.end(false); } return true;
   }
   damageEnemy(e, amount) {
-    if (e.dead) return; e.hp -= amount * (e.kind === 'enemy' && e.type === 4 ? .6 : 1); e.flash = .1;
+    if (e.dead) return;
+    if (e.kind === 'target') { this.mission?.damageTarget(e, amount); return; }
+    if (e.storyBoss) { amount = Math.min(amount, e.maxHp * .12); const floor = e.phase === 1 ? .68 : e.phase === 2 ? .32 : .001; if (e.phaseAge < 10) amount = Math.min(amount, Math.max(0, e.hp - e.maxHp * floor)); }
+    e.hp -= amount * (e.kind === 'enemy' && e.type === 4 ? .6 : 1); e.flash = .1;
     if (e.hp <= 0) {
       if (e.kind === 'boss') {
         e.dead = true; this.stats.bosses++; this.score += 5000; this.burst(e.x, e.y, '#ff84ba', 90); this.ring(e.x, e.y, '#fff3cb', 500, 1.7); NE.Audio.play('win'); NE.Save.achievement('boss');
         this.finishHealthRatio = this.player.hp / this.player.maxHp;
         this.projectiles = []; this.waves = []; this.player.hp = this.player.maxHp; this.player.energy = this.player.maxEnergy; this.nextBoss = this.time + 150;
-        if (this.mode !== 'endless') { this.checkQuest(); this.end(true); } else { this.boss = null; this.addMass(60); this.addXP(220); NE.UI.toast('Архонт повержен! Следующая охота через 2:30.'); }
+        if (this.mission) { this.mission.bossDefeated(); } else if (this.mode !== 'endless') { this.checkQuest(); this.end(true); } else { this.boss = null; this.addMass(60); this.addXP(220); NE.UI.toast('Архонт повержен! Следующая охота через 2:30.'); }
       } else if (this.player.mass >= e.mass * .85) this.absorb(e);
       else {
         e.dead = true; this.score += Math.ceil(e.mass * 5); this.burst(e.x, e.y, '#ffcc9d', 16); const room = NE.C.foodCap - this.food.filter(f => !f.dead).length;
@@ -107,9 +111,9 @@ NE.Game = class {
     p.energy -= ability.cost; p.cooldowns[id] = ability.cooldown * Math.max(.5, 1 - p.upgrades.cooldown * .1); this.stats.abilities++; NE.Audio.play(id);
     if (id === 'pulse') {
       const radius = (140 + p.r) * (1 + p.upgrades.pulse * .22); this.ring(p.x, p.y, '#4ce6e0', radius, .65); this.burst(p.x, p.y, '#4ce6e0', 20);
-      for (const e of this.grid.query(p.x, p.y, radius + 100)) if ((e.kind === 'enemy' || e.kind === 'boss') && NE.distance(p, e) < radius + e.r) {
+      for (const e of this.grid.query(p.x, p.y, radius + 100)) if ((e.kind === 'enemy' || e.kind === 'boss' || e.kind === 'target') && NE.distance(p, e) < radius + e.r) {
         const d = NE.distance(p, e) || 1;
-        if (e.kind !== 'boss') { e.knockX = (e.x - p.x) / d * 330; e.knockY = (e.y - p.y) / d * 330; }
+        if (e.kind === 'enemy') { e.knockX = (e.x - p.x) / d * 330; e.knockY = (e.y - p.y) / d * 330; }
         this.damageEnemy(e, (30 + p.mass * .28) * (1 + p.upgrades.pulse * .15) * this.damageMultiplier());
         if (this.state === 'result') break;
       }
@@ -148,7 +152,16 @@ NE.Game = class {
     const current = q.key === 'stage' ? this.player.stage : this.stats[q.key];
     if (current >= q.goal) { this.questIndex++; this.score += 300; this.addMass(q.mass); this.addXP(q.xp); this.player.hp = Math.min(this.player.maxHp, this.player.hp + 12); NE.UI.toast(`Задача выполнена · +${q.xp} XP · +${q.mass} массы`); }
   }
-  spawnBoss() { if (this.boss && !this.boss.dead) return; this.boss = NE.Entities.boss(this); if (this.biome === 'core') { this.boss.hp *= 1.35; this.boss.maxHp = this.boss.hp; this.boss.empowered = true; } this.announce(this.boss.empowered ? 'ВЕРХОВНЫЙ АРХОНТ' : 'АРХОНТ ПРОБУДИЛСЯ', 'АТАКУЙТЕ СПОСОБНОСТЯМИ · УХОДИТЕ ИЗ КОРИДОРА РЫВКА', '#ff719f'); this.ring(this.boss.x, this.boss.y, '#ff6a9b', 350, 1.5); NE.UI.toast(`${this.biome === 'core' ? 'ВЕРХОВНЫЙ ' : ''}АРХОНТ ПРОБУДИЛСЯ. Атакуйте способностями, уклоняйтесь от рывков.`, true); NE.Audio.play('hurt'); }
+  spawnBoss() {
+    if (this.boss && !this.boss.dead) return;
+    this.boss = NE.Entities.boss(this);
+    if (this.sector?.id === 1) this.boss.name = 'МАТКА САДА';
+    if (this.sector?.id === 4) this.boss.name = 'ИСТОЧНИК';
+    if (this.biome === 'core') { this.boss.hp *= 1.35; this.boss.maxHp = this.boss.hp; this.boss.empowered = true; }
+    const name = this.boss.name || (this.boss.empowered ? 'ВЕРХОВНЫЙ АРХОНТ' : 'АРХОНТ');
+    this.announce(name, 'АТАКУЙТЕ СПОСОБНОСТЯМИ · УХОДИТЕ ИЗ КОРИДОРА РЫВКА', '#ff719f'); this.ring(this.boss.x, this.boss.y, '#ff6a9b', 350, 1.5);
+    NE.UI.toast(`${name} ПРОБУДИЛСЯ. Атакуйте способностями, уклоняйтесь от рывков.`, true); NE.Audio.play('hurt');
+  }
   currentAt(x, y) { return this.biome === 'current' ? { x: Math.sin(y / 260 + this.time * .12) * 25, y: Math.cos(x / 380 - this.time * .1) * 18 } : { x: 0, y: 0 }; }
   terrainActive(zone) { return (this.time + zone.offset) % 9 >= 2.3; }
   updateTerrain() { for (const zone of this.terrain) if (this.terrainActive(zone) && NE.distance(this.player, zone) < zone.r && this.player.phase <= 0) this.hurt(this.biome === 'core' ? 17 : 13, { kind: 'field' }); }
@@ -181,15 +194,16 @@ NE.Game = class {
     if (moving) p.angle = Math.atan2(p.vy, p.vx);
     p.energy = NE.clamp(p.energy + (p.boosting ? -21 * Math.max(.5, 1 - p.upgrades.boost * .1) : 7 + p.upgrades.regen * 1.8) * dt, 0, p.maxEnergy);
     p.hp = Math.min(p.maxHp, p.hp + (.12 + p.upgrades.heal * .7) * dt); p.r += (NE.radius(p.mass) - p.r) * (1 - Math.exp(-2.2 * dt));
-    this.grid.rebuild(this.food, this.enemies, [p], this.boss && !this.boss.dead ? [this.boss] : []);
+    this.grid.rebuild(this.food, this.enemies, [p], this.boss && !this.boss.dead ? [this.boss] : [], this.mission?.objects || []);
     for (const e of this.enemies) if (!e.dead) { NE.AI.update(e, this, dt); const drift = this.currentAt(e.x, e.y); e.x = NE.clamp(e.x + drift.x * dt, e.r, NE.C.width - e.r); e.y = NE.clamp(e.y + drift.y * dt, e.r, NE.C.height - e.r); }
-    if (this.boss && !this.boss.dead) NE.AI.boss(this.boss, this, dt);
-    this.grid.rebuild(this.food, this.enemies, [p], this.boss && !this.boss.dead ? [this.boss] : []);
+    this.mission?.resolve(p); for (const e of this.enemies) if (!e.dead) this.mission?.resolve(e);
+    if (this.boss && !this.boss.dead) { NE.AI.boss(this.boss, this, dt); this.mission?.resolve(this.boss); }
+    this.grid.rebuild(this.food, this.enemies, [p], this.boss && !this.boss.dead ? [this.boss] : [], this.mission?.objects || []);
     NE.Collisions.food(this, dt); if (this.state === 'result') return;
     NE.Collisions.actors(this, dt); if (this.state === 'result') return;
     for (const shot of this.projectiles) { shot.x += shot.vx * dt; shot.y += shot.vy * dt; shot.life -= dt; if (shot.life <= 0 || shot.x < 0 || shot.x > NE.C.width || shot.y < 0 || shot.y > NE.C.height) shot.dead = true; }
     this.projectiles = this.projectiles.filter(s => !s.dead); this.waves.forEach(w => w.r += 230 * dt); this.waves = this.waves.filter(w => w.r < w.maxR);
-    this.updateEvent(dt); this.updateTerrain(); if (this.state === 'result') return; this.checkQuest(); this.updateEffects(dt);
+    this.updateEvent(dt); this.updateTerrain(); if (this.state === 'result') return; this.checkQuest(); this.updateEffects(dt); if (this.state === 'running') this.mission?.update(dt); if (this.state === 'result') return;
     this.food = this.food.filter(f => !f.dead); this.enemies = this.enemies.filter(e => !e.dead);
     this.spawnTimer += dt;
     if (this.spawnTimer > .7) {
@@ -197,16 +211,16 @@ NE.Game = class {
       const count = Math.min(24, (this.sector?.food ?? 340) - this.food.length);
       for (let i = 0; i < count; i++) { if (i % 3 === 0) { const a = NE.rand(0, Math.PI * 2), radius = NE.rand(110, 650); this.food.push(NE.Entities.food(NE.clamp(p.x + Math.cos(a) * radius, 20, NE.C.width - 20), NE.clamp(p.y + Math.sin(a) * radius, 20, NE.C.height - 20))); } else this.food.push(NE.Entities.food()); }
       if (this.enemies.length < (this.sector?.population ?? 58) + Math.min(this.sector ? 12 : 16, Math.floor(this.time / 30))) {
-        const type = Math.floor(NE.rand(0, 6)), scale = (1 + this.time / 750) * (this.sector?.difficulty ?? 1); const mass = Math.random() < .5 ? NE.rand(p.mass * .3, p.mass * .82) : NE.rand(...NE.species[type].mass) * scale; this.spawnEnemy(type, undefined, undefined, NE.clamp(mass, 5, 650));
+        const type = Math.floor(NE.rand(0, this.sector?.id === 0 && this.time < 180 ? 3 : 6)), scale = (1 + this.time / 750) * (this.sector?.difficulty ?? 1); const mass = Math.random() < .5 ? NE.rand(p.mass * .3, p.mass * .82) : NE.rand(...NE.species[type].mass) * scale; const elite = this.mission && this.sector.id > 0 && this.time > 100 && Math.random() < .1; this.spawnEnemy(elite ? (Math.random() < .5 ? 3 : 5) : type, undefined, undefined, elite ? Math.min(2000, p.mass * 1.3 + this.sector.id * 25) : NE.clamp(mass, 5, 650));
       }
     }
+    if (this.mission) this.food = this.food.filter(f => this.mission.passable(f));
     if (!this.event && this.time >= this.nextEvent) this.startEvent(['bloom', 'migration', 'storm'][this.eventIndex++ % 3]);
-    const bossEnabled = !this.sector || this.sector.bossTime !== null;
-    if (bossEnabled && (!this.boss || this.boss.dead) && (this.time >= this.nextBoss || (p.stage === 4 && this.stats.bosses === 0))) this.spawnBoss();
+    const bossEnabled = !this.sector;
+    if (bossEnabled && (!this.boss || this.boss.dead) && this.time >= this.nextBoss) this.spawnBoss();
     if (this.time >= 180) NE.Save.achievement('survivor'); if (this.score >= 10000) NE.Save.achievement('score');
     this.trailTimer += dt; if (this.trailTimer > .07) { this.trailTimer = 0; p.trail.push({ x: p.x, y: p.y }); if (p.trail.length > 18) p.trail.shift(); for (const e of this.enemies) { e.trail.push({ x: e.x, y: e.y }); if (e.trail.length > 7) e.trail.shift(); } if (p.boosting) this.burst(p.x - Math.cos(p.angle) * p.r, p.y - Math.sin(p.angle) * p.r, '#4ce6e0', 2); }
     if (this.tutorial) this.updateTutorial();
-    if (this.sector && this.state === 'running' && NE.Progress.campaignProgress(this).complete) this.end(true);
   }
   updateTutorial() {
     const conditions = [this.stats.distance > 120, this.stats.food >= 5, this.player.boosting && this.player.energy < 80, this.stats.abilities >= 1, this.stats.kills >= 1];
